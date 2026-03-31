@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --font-sans: "Raleway", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-mre-blue: #003366;
+  --color-mre-gray: #575757;
+}
+
+@layer base {
+  body {
+    @apply bg-stone-50 text-stone-900 font-sans;
+  }
+}
+
+.markdown-body {
+  @apply prose prose-stone max-w-none;
+  h1, h2, h3, h4 {
+    @apply font-bold text-mre-blue mt-6 mb-4;
+  }
+  p {
+    @apply mb-4 leading-relaxed;
+  }
+  ul {
+    @apply list-disc pl-6 mb-4;
+  }
+  li {
+    @apply mb-1;
+  }
+}
