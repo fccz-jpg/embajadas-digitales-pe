@@ -1,7 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { MediaSource } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 export const mockNews: Record<string, { title: string, source: string, preview: string, date: string, url: string }[]> = {
   "Ciudad de México": [
@@ -195,122 +192,21 @@ export const mockMediaSources: MediaSource[] = [
 ];
 
 export async function generateEmbassyReport(location: string, _searchQuery: string) {
-  const prompt = `
-    Actúa como un analista de inteligencia estratégica para el Ministerio de Relaciones Exteriores (MRE) de Perú.
-    Genera un monitoreo de medios estructurado para la Embajada Digital en ${location}.
-
-    INSTRUCCIONES:
-    1. Realiza una búsqueda exhaustiva de noticias recientes (últimas 24-48 horas) relacionadas con la situación actual en ${location} (política, economía y cultura).
-    2. Analiza la información encontrada y sepárala en 5 secciones.
-    3. Cada sección debe ser una nota distinta y completa.
-
-    SECCIONES:
-    - politico: Análisis de política interna, gobernanza y estabilidad.
-    - economico: Análisis de la situación económica general, inflación, crecimiento y sectores clave.
-    - cultural: Análisis de la vida cultural, eventos sociales y tendencias de la sociedad.
-    - relaciones_internacionales: Análisis de relaciones diplomáticas, organismos internacionales y agenda bilateral.
-    - panorama_general: Un resumen ejecutivo del panorama general del país en el periodo monitoreado.
-
-    REQUISITOS DE FORMATO:
-    - Usa Markdown para el formato.
-    - Cada sección debe comenzar con un título descriptivo (ej: "Política Interna").
-    - Usa negritas para resaltar datos clave, cifras y nombres de medios.
-    - El tono debe ser profesional, analítico y de alta dirección.
-    - NO realices comparaciones o cruces con Perú en este reporte. Enfócate exclusivamente en la situación de ${location}.
-    - Si no hay reportes relevantes para una sección, indica: "Sin reportes relevantes en los medios monitoreados durante el presente periodo."
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            politico: { type: Type.STRING, description: "Nota política en formato markdown" },
-            economico: { type: Type.STRING, description: "Nota económica en formato markdown" },
-            cultural: { type: Type.STRING, description: "Nota cultural en formato markdown" },
-            relaciones_internacionales: { type: Type.STRING, description: "Nota de relaciones internacionales y diplomacia en formato markdown" },
-            panorama_general: { type: Type.STRING, description: "Panorama general del país en formato markdown" },
-            sources: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  source: { type: Type.STRING },
-                  url: { type: Type.STRING },
-                  date: { type: Type.STRING }
-                }
-              }
-            }
-          },
-          required: ["politico", "economico", "cultural", "relaciones_internacionales", "panorama_general", "sources"],
-        },
-      },
-    });
-
-    return JSON.parse(response.text);
-  } catch (error) {
-    console.error("Error generating report:", error);
-    throw error;
-  }
+  const res = await fetch("/api/report", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ location }),
+  });
+  if (!res.ok) throw new Error("Error al generar el reporte");
+  return res.json();
 }
 
 export async function generateMediaDatabase(location: string): Promise<MediaSource[]> {
-  const prompt = `
-    Eres un experto en monitoreo de medios de comunicación internacionales para el Ministerio de Relaciones Exteriores de Perú.
-
-    Genera una lista actualizada de los principales medios de comunicación de ${location} que son relevantes para el seguimiento de noticias sobre política, economía, relaciones internacionales y cultura.
-
-    Incluye medios de alta credibilidad y alcance nacional o internacional. Verifica que las URLs sean correctas y los medios estén activos actualmente.
-
-    Para cada medio, proporciona:
-    - name: nombre del medio
-    - type: "Diario", "Radio", "TV" o "Digital"
-    - url: URL oficial del medio
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              type: { type: Type.STRING },
-              url: { type: Type.STRING },
-            },
-            required: ["name", "type", "url"]
-          }
-        },
-      },
-    });
-
-    const rawSources = JSON.parse(response.text) as { name: string; type: string; url: string }[];
-    const validTypes = ["Diario", "Radio", "TV", "Digital"] as const;
-
-    return rawSources.map((s, i) => ({
-      id: `gen_${Date.now()}_${i}`,
-      name: s.name,
-      country: location,
-      location,
-      type: (validTypes.includes(s.type as typeof validTypes[number]) ? s.type : "Digital") as MediaSource["type"],
-      url: s.url,
-      status: "Activo" as const,
-      lastCheck: new Date().toISOString(),
-    }));
-  } catch (error) {
-    console.error("Error generating media database:", error);
-    throw error;
-  }
+  const res = await fetch("/api/media", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ location }),
+  });
+  if (!res.ok) throw new Error("Error al actualizar la base de medios");
+  return res.json();
 }

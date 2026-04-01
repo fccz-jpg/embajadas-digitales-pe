@@ -80,14 +80,27 @@ export default function App() {
   const [isCheckingMedia, setIsCheckingMedia] = useState(false);
   const [isUpdatingMedia, setIsUpdatingMedia] = useState(false);
 
-  // Load reports from local storage
+  // Load reports from API (fallback to localStorage when offline)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("mre_reports");
-      if (saved) setReports(JSON.parse(saved));
-    } catch {
-      localStorage.removeItem("mre_reports");
-    }
+    fetch("/api/reports")
+      .then(r => r.json())
+      .then((apiReports: Report[]) => {
+        if (apiReports.length > 0) {
+          setReports(apiReports);
+          localStorage.setItem("mre_reports", JSON.stringify(apiReports));
+        } else {
+          const saved = localStorage.getItem("mre_reports");
+          if (saved) setReports(JSON.parse(saved));
+        }
+      })
+      .catch(() => {
+        try {
+          const saved = localStorage.getItem("mre_reports");
+          if (saved) setReports(JSON.parse(saved));
+        } catch {
+          localStorage.removeItem("mre_reports");
+        }
+      });
   }, []);
 
   const saveReports = (newReports: Report[]) => {
@@ -99,23 +112,7 @@ export default function App() {
     setIsGenerating(true);
     setError(null);
     try {
-      const content = await generateEmbassyReport(location, location);
-
-      const newReport: Report = {
-        id: crypto.randomUUID(),
-        location,
-        content,
-        createdAt: new Date().toISOString(),
-        rawNews: "Real-time search via Google Grounding",
-        newsItems: content.sources?.map((s: { title: string; source: string; date: string; url: string }) => ({
-          title: s.title,
-          source: s.source,
-          preview: s.title,
-          date: s.date,
-          url: s.url
-        })) ?? []
-      };
-
+      const newReport: Report = await generateEmbassyReport(location, location);
       const updatedReports = [newReport, ...reports.filter(r => r.location !== location)];
       saveReports(updatedReports);
       setSelectedReport(newReport);
