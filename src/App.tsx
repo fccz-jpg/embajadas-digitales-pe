@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   FileText, 
   Plus, 
@@ -33,8 +33,31 @@ import ReactMarkdown from "react-markdown";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn, getMostFrequentWords } from "./lib/utils";
-import { generateEmbassyReport, mockNews, mockMediaSources, mockCountryData } from "./services/geminiService";
+import { generateEmbassyReport, generateMediaDatabase, mockNews, mockMediaSources, mockCountryData } from "./services/geminiService";
 import { Report, MediaSource, EMBASSIES } from "./types";
+
+// Type-safe accessor for report content sections
+function getReportContent(
+  content: Report["content"],
+  tab: "politico" | "economico" | "cultural" | "relaciones_internacionales" | "panorama_general"
+): string {
+  if (typeof content === "string") return content;
+  return content[tab] ?? "";
+}
+
+// Real-time status check via no-cors fetch (checks if server responds)
+async function checkUrlReachable(url: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    await fetch(url, { method: "HEAD", mode: "no-cors", signal: controller.signal, cache: "no-store" });
+    clearTimeout(timeout);
+    return true;
+  } catch {
+    clearTimeout(timeout);
+    return false;
+  }
+}
 import EmbassyMap from "./components/EmbassyMap";
 import WorldMapView from "./components/WorldMapView";
 
@@ -47,16 +70,23 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [location, setLocation] = useState("Ciudad de México");
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"politico" | "economico" | "cultural" | "mercados_industria" | "panorama_general">("politico");
+  const [activeTab, setActiveTab] = useState<"politico" | "economico" | "cultural" | "relaciones_internacionales" | "panorama_general">("politico");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [mediaSources, setMediaSources] = useState<MediaSource[]>(mockMediaSources);
+  const [mediaCountryFilter, setMediaCountryFilter] = useState<string>("all");
+  const [isCheckingMedia, setIsCheckingMedia] = useState(false);
+  const [isUpdatingMedia, setIsUpdatingMedia] = useState(false);
 
   // Load reports from local storage
   useEffect(() => {
-    const saved = localStorage.getItem("mre_reports");
-    if (saved) {
-      setReports(JSON.parse(saved));
+    try {
+      const saved = localStorage.getItem("mre_reports");
+      if (saved) setReports(JSON.parse(saved));
+    } catch {
+      localStorage.removeItem("mre_reports");
     }
   }, []);
 
@@ -67,69 +97,97 @@ export default function App() {
 
   const handleUpdateMonitoring = useCallback(async () => {
     setIsGenerating(true);
+    setError(null);
     try {
       const content = await generateEmbassyReport(location, location);
-      
+
       const newReport: Report = {
         id: crypto.randomUUID(),
         location,
         content,
         createdAt: new Date().toISOString(),
         rawNews: "Real-time search via Google Grounding",
-        newsItems: content.sources?.map((s: any) => ({
+        newsItems: content.sources?.map((s: { title: string; source: string; date: string; url: string }) => ({
           title: s.title,
           source: s.source,
           preview: s.title,
           date: s.date,
           url: s.url
-        })) || []
+        })) ?? []
       };
 
-      const updatedReports = [newReport, ...reports.filter(r => r.id !== newReport.id)];
+      const updatedReports = [newReport, ...reports.filter(r => r.location !== location)];
       saveReports(updatedReports);
       setSelectedReport(newReport);
       setActiveView("dashboard");
-    } catch (error) {
-      console.error("Failed to update monitoring", error);
+    } catch (err) {
+      setError("Error al actualizar el monitoreo. Verifique su conexión e intente de nuevo.");
+      console.error("Failed to update monitoring", err);
     } finally {
       setIsGenerating(false);
     }
   }, [location, reports]);
 
-  // Hourly update logic
+  // Keep a ref to the latest handleUpdateMonitoring to avoid stale closure in interval
+  const handleUpdateMonitoringRef = useRef(handleUpdateMonitoring);
+  handleUpdateMonitoringRef.current = handleUpdateMonitoring;
+
+  // Hourly update logic — only triggers if last report is > 1 hour old
   useEffect(() => {
     const checkAndUpdate = () => {
       const lastReport = reports.find(r => r.location === location);
-      if (lastReport) {
-        const lastUpdate = new Date(lastReport.createdAt);
-        const now = new Date();
-        const diffInHours = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
-        
-        if (diffInHours >= 1) {
-          console.log("Real-time update triggered: 1 hour passed since last report.");
-          handleUpdateMonitoring();
-        }
-      } else {
-        // If no report exists for this location, generate the first one
-        handleUpdateMonitoring();
+      if (!lastReport) return;
+      const diffInHours = (Date.now() - new Date(lastReport.createdAt).getTime()) / (1000 * 60 * 60);
+      if (diffInHours >= 1) {
+        handleUpdateMonitoringRef.current();
       }
     };
 
-    // Check every 5 minutes
     const interval = setInterval(checkAndUpdate, 5 * 60 * 1000);
-    
-    // Initial check
-    if (reports.length > 0) {
-      checkAndUpdate();
-    }
-
     return () => clearInterval(interval);
-  }, [location, reports.length, handleUpdateMonitoring]);
+  }, [location, reports]);
 
-  const filteredMedia = mockMediaSources.filter(source => 
-    source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    source.location.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Real-time media status check using no-cors HEAD requests
+  const handleCheckMediaStatus = useCallback(async () => {
+    setIsCheckingMedia(true);
+    setMediaSources(prev => prev.map(s => ({ ...s, status: "Verificando" as const })));
+    const updated = await Promise.all(
+      mediaSources.map(async (source) => {
+        const alive = await checkUrlReachable(source.url);
+        return { ...source, status: (alive ? "Activo" : "Inactivo") as MediaSource["status"], lastCheck: new Date().toISOString() };
+      })
+    );
+    setMediaSources(updated);
+    setIsCheckingMedia(false);
+  }, [mediaSources]);
+
+  // Refresh media database for current location using Gemini AI
+  const handleUpdateMediaDatabase = useCallback(async () => {
+    setIsUpdatingMedia(true);
+    setError(null);
+    try {
+      const newSources = await generateMediaDatabase(location);
+      setMediaSources(prev => [
+        ...prev.filter(s => s.location !== location),
+        ...newSources,
+      ]);
+    } catch (err) {
+      setError("No se pudo actualizar la base de medios. Intente de nuevo.");
+      console.error("Failed to update media database", err);
+    } finally {
+      setIsUpdatingMedia(false);
+    }
+  }, [location]);
+
+  const filteredMedia = mediaSources.filter(source => {
+    const matchesSearch = source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      source.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      source.country.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCountry = mediaCountryFilter === "all" || source.country === mediaCountryFilter;
+    return matchesSearch && matchesCountry;
+  });
+
+  const uniqueMediaCountries = [...new Set(mediaSources.map(s => s.country))].sort();
 
   const latestReportForLocation = reports.find(r => r.location === location);
 
@@ -327,6 +385,16 @@ export default function App() {
           </div>
         </header>
 
+        {error && (
+          <div className="bg-red-50 border-b border-red-200 px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700 text-sm font-medium">
+              <AlertTriangle size={16} />
+              {error}
+            </div>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
+          </div>
+        )}
+
         {activeView === "home" ? (
           <div className="p-8 h-full flex flex-col">
             <div className="flex-1">
@@ -430,68 +498,139 @@ export default function App() {
                     {latestReportForLocation ? (
                       <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col">
                         {/* Analysis Tabs as Fields at the top */}
-                        <div className="grid grid-cols-4 border-b border-stone-100">
-                          {(["politico", "economico", "cultural", "mercados_industria"] as const).map((tab) => (
-                            <button
-                              key={tab}
-                              onClick={() => setActiveTab(tab)}
-                              className={cn(
-                                "py-4 px-2 text-[9px] font-black tracking-widest transition-all border-r border-stone-50 last:border-r-0 flex flex-col items-center gap-1",
-                                activeTab === tab 
-                                  ? "bg-stone-50 text-mre-blue border-b-2 border-b-mre-blue" 
-                                  : "text-stone-400 hover:bg-stone-50/50"
-                              )}
-                            >
-                              {tab === "politico" && <Shield size={14} />}
-                              {tab === "economico" && <Coins size={14} />}
-                              {tab === "cultural" && <Languages size={14} />}
-                              {tab === "mercados_industria" && <TrendingUp size={14} />}
-                              {tab === "mercados_industria" ? "Mercados e industria" : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                            </button>
-                          ))}
+                        <div className="flex border-b border-stone-100 overflow-hidden">
+                          {/* Político — Navy blue */}
+                          <button
+                            onClick={() => setActiveTab("politico")}
+                            className={cn(
+                              "flex-1 py-4 px-2 text-[9px] font-black tracking-widest transition-all flex flex-col items-center gap-1.5 border-r border-stone-100",
+                              activeTab === "politico"
+                                ? "bg-blue-950 text-white"
+                                : "text-stone-400 hover:bg-blue-950/5 hover:text-blue-900"
+                            )}
+                          >
+                            <Shield size={15} className={activeTab === "politico" ? "text-blue-300" : ""} />
+                            <span>Político</span>
+                            {activeTab === "politico" && <span className="w-4 h-0.5 bg-blue-400 rounded-full" />}
+                          </button>
+
+                          {/* Económico — Amber */}
+                          <button
+                            onClick={() => setActiveTab("economico")}
+                            className={cn(
+                              "flex-1 py-4 px-2 text-[9px] font-black tracking-widest transition-all flex flex-col items-center gap-1.5 border-r border-stone-100",
+                              activeTab === "economico"
+                                ? "bg-amber-500 text-white"
+                                : "text-stone-400 hover:bg-amber-50 hover:text-amber-700"
+                            )}
+                          >
+                            <Coins size={15} className={activeTab === "economico" ? "text-amber-100" : ""} />
+                            <span>Económico</span>
+                            {activeTab === "economico" && <span className="w-4 h-0.5 bg-amber-200 rounded-full" />}
+                          </button>
+
+                          {/* Cultural — Violet */}
+                          <button
+                            onClick={() => setActiveTab("cultural")}
+                            className={cn(
+                              "flex-1 py-4 px-2 text-[9px] font-black tracking-widest transition-all flex flex-col items-center gap-1.5 border-r border-stone-100",
+                              activeTab === "cultural"
+                                ? "bg-violet-600 text-white"
+                                : "text-stone-400 hover:bg-violet-50 hover:text-violet-700"
+                            )}
+                          >
+                            <Languages size={15} className={activeTab === "cultural" ? "text-violet-200" : ""} />
+                            <span>Cultural</span>
+                            {activeTab === "cultural" && <span className="w-4 h-0.5 bg-violet-300 rounded-full" />}
+                          </button>
+
+                          {/* Relaciones Internacionales — Teal */}
+                          <button
+                            onClick={() => setActiveTab("relaciones_internacionales")}
+                            className={cn(
+                              "flex-1 py-4 px-2 text-[9px] font-black tracking-widest transition-all flex flex-col items-center gap-1.5",
+                              activeTab === "relaciones_internacionales"
+                                ? "bg-teal-600 text-white"
+                                : "text-stone-400 hover:bg-teal-50 hover:text-teal-700"
+                            )}
+                          >
+                            <Globe size={15} className={activeTab === "relaciones_internacionales" ? "text-teal-200" : ""} />
+                            <span className="text-center leading-tight">RR. Int.</span>
+                            {activeTab === "relaciones_internacionales" && <span className="w-4 h-0.5 bg-teal-300 rounded-full" />}
+                          </button>
                         </div>
 
-                        <div className="p-8 flex-1">
-                          <div className="mb-6 pb-6 border-b border-stone-50">
+                        <div className={cn(
+                          "flex-1",
+                          activeTab === "politico" && "border-l-4 border-blue-950",
+                          activeTab === "economico" && "border-l-4 border-amber-500",
+                          activeTab === "cultural" && "border-l-4 border-violet-600",
+                          activeTab === "relaciones_internacionales" && "border-l-4 border-teal-600"
+                        )}>
+                          <div className={cn(
+                            "p-8 border-b",
+                            activeTab === "politico" && "bg-blue-950 border-blue-900",
+                            activeTab === "economico" && "bg-amber-50 border-amber-100",
+                            activeTab === "cultural" && "bg-violet-50 border-violet-100",
+                            activeTab === "relaciones_internacionales" && "bg-teal-50 border-teal-100"
+                          )}>
                             <div className="flex items-center gap-2 mb-2">
                               <span className={cn(
                                 "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest",
-                                activeTab === "politico" && "bg-blue-100 text-blue-700",
+                                activeTab === "politico" && "bg-blue-800 text-blue-200",
                                 activeTab === "economico" && "bg-amber-100 text-amber-700",
-                                activeTab === "cultural" && "bg-purple-100 text-purple-700",
-                                activeTab === "mercados_industria" && "bg-green-100 text-green-700"
+                                activeTab === "cultural" && "bg-violet-100 text-violet-700",
+                                activeTab === "relaciones_internacionales" && "bg-teal-100 text-teal-700"
                               )}>
-                                Informe {activeTab === "mercados_industria" ? "de Mercados" : activeTab}
+                                {activeTab === "politico" && "Informe político"}
+                                {activeTab === "economico" && "Informe económico"}
+                                {activeTab === "cultural" && "Informe cultural"}
+                                {activeTab === "relaciones_internacionales" && "Informe diplomático"}
                               </span>
-                              <span className="text-[8px] font-bold text-stone-300 tracking-widest uppercase">ID: {latestReportForLocation.id.slice(0, 8)}</span>
+                              <span className={cn(
+                                "text-[8px] font-bold tracking-widest uppercase",
+                                activeTab === "politico" ? "text-blue-600" : "text-stone-300"
+                              )}>ID: {latestReportForLocation.id.slice(0, 8)}</span>
                             </div>
-                            <h1 className="text-3xl font-black text-stone-900 tracking-tighter mb-1">
+                            <h1 className={cn(
+                              "text-3xl font-black tracking-tighter mb-1",
+                              activeTab === "politico" ? "text-white" : "text-stone-900"
+                            )}>
                               {activeTab === "politico" && "Análisis Político y Diplomático"}
                               {activeTab === "economico" && "Reporte Económico y Comercial"}
                               {activeTab === "cultural" && "Cooperación Cultural y Técnica"}
-                              {activeTab === "mercados_industria" && "Inteligencia de Mercados e Industria"}
-                              <span className="text-stone-400 font-light ml-2">| {location}</span>
+                              {activeTab === "relaciones_internacionales" && "Relaciones Internacionales y Diplomacia"}
+                              <span className={cn(
+                                "font-light ml-2",
+                                activeTab === "politico" ? "text-blue-400" : "text-stone-400"
+                              )}>| {location}</span>
                             </h1>
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-mre-blue tracking-widest">
+                            <div className={cn(
+                              "flex items-center gap-2 text-[10px] font-bold tracking-widest",
+                              activeTab === "politico" ? "text-blue-300" : "text-mre-blue"
+                            )}>
                               <ExternalLink size={12} />
-                              <a 
-                                href={latestReportForLocation.newsItems?.[0]?.url || "#"} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="hover:underline"
-                              >
-                                Fuente: {latestReportForLocation.newsItems?.[0]?.source || "Monitoreo Global"}
-                              </a>
+                              {latestReportForLocation.newsItems?.[0]?.url ? (
+                                <a
+                                  href={latestReportForLocation.newsItems[0].url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:underline"
+                                >
+                                  Fuente: {latestReportForLocation.newsItems[0].source}
+                                </a>
+                              ) : (
+                                <span>Fuente: {latestReportForLocation.newsItems?.[0]?.source || "Monitoreo Global"}</span>
+                              )}
                             </div>
                           </div>
+                          <div className="p-8">
 
                           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                             <div className="lg:col-span-3">
                               <div className="markdown-body prose prose-stone max-w-none">
                                 <ReactMarkdown>
-                                  {typeof latestReportForLocation.content === 'string' 
-                                    ? latestReportForLocation.content 
-                                    : (latestReportForLocation.content as any)[activeTab]}
+                                  {getReportContent(latestReportForLocation.content, activeTab)}
                                 </ReactMarkdown>
                               </div>
                             </div>
@@ -510,12 +649,12 @@ export default function App() {
                                       activeTab === "politico" && "text-blue-600",
                                       activeTab === "economico" && "text-green-600",
                                       activeTab === "cultural" && "text-purple-600",
-                                      activeTab === "mercados_industria" && "text-emerald-600"
+                                      activeTab === "relaciones_internacionales" && "text-teal-600"
                                     )}>
                                       {activeTab === "politico" && "+1.2%"}
                                       {activeTab === "economico" && "+3.5%"}
                                       {activeTab === "cultural" && "+0.8%"}
-                                      {activeTab === "mercados_industria" && "+5.2%"}
+                                      {activeTab === "relaciones_internacionales" && "+2.1%"}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
@@ -524,7 +663,7 @@ export default function App() {
                                       {activeTab === "politico" && "Alto"}
                                       {activeTab === "economico" && "Medio"}
                                       {activeTab === "cultural" && "Bajo"}
-                                      {activeTab === "mercados_industria" && "Crítico"}
+                                      {activeTab === "relaciones_internacionales" && "Alto"}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
@@ -533,7 +672,7 @@ export default function App() {
                                       {activeTab === "politico" && "95%"}
                                       {activeTab === "economico" && "92%"}
                                       {activeTab === "cultural" && "99%"}
-                                      {activeTab === "mercados_industria" && "90%"}
+                                      {activeTab === "relaciones_internacionales" && "94%"}
                                     </span>
                                   </div>
                                 </div>
@@ -548,7 +687,7 @@ export default function App() {
                                   {activeTab === "politico" && "Se observa un incremento en las menciones diplomáticas bilaterales en medios oficiales."}
                                   {activeTab === "economico" && "Nuevas proyecciones sugieren un aumento en el intercambio de productos agroindustriales."}
                                   {activeTab === "cultural" && "La agenda cultural muestra una alta receptividad hacia las expresiones artísticas peruanas."}
-                                  {activeTab === "mercados_industria" && "Sectores de logística y puertos presentan las mayores oportunidades de inversión inmediata."}
+                                  {activeTab === "relaciones_internacionales" && "Organismos como CARICOM, OEA y SICA son claves para la agenda bilateral con la región."}
                                 </p>
                               </div>
 
@@ -559,9 +698,7 @@ export default function App() {
                                 </p>
                                 <div className="flex flex-wrap gap-2">
                                   {getMostFrequentWords(
-                                    typeof latestReportForLocation.content === 'string' 
-                                      ? latestReportForLocation.content 
-                                      : (latestReportForLocation.content as any)[activeTab]
+                                    getReportContent(latestReportForLocation.content, activeTab)
                                   ).map(({ word, count }, i) => (
                                     <div key={i} className="flex items-center gap-1.5 bg-white border border-stone-200 px-2 py-1 rounded-md shadow-sm">
                                       <span className="text-[10px] font-bold text-stone-700">{word}</span>
@@ -573,6 +710,7 @@ export default function App() {
                             </div>
                           </div>
                         </div>
+                        </div>
 
                         {/* News Sources used for this report */}
                         <div className="bg-stone-50/80 border-t border-stone-100 p-6">
@@ -582,17 +720,27 @@ export default function App() {
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {latestReportForLocation.newsItems?.map((news, idx) => (
-                              <a 
-                                key={idx}
-                                href={news.url || "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 bg-white border border-stone-200 px-3 py-1.5 rounded-full shadow-sm hover:border-mre-blue/30 transition-all group"
-                              >
-                                <Globe size={10} className="text-stone-300 group-hover:text-mre-blue" />
-                                <span className="text-[10px] font-bold text-stone-600">{news.source}</span>
-                                <ExternalLink size={8} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </a>
+                              news.url ? (
+                                <a
+                                  key={idx}
+                                  href={news.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 bg-white border border-stone-200 px-3 py-1.5 rounded-full shadow-sm hover:border-mre-blue/30 transition-all group"
+                                >
+                                  <Globe size={10} className="text-stone-300 group-hover:text-mre-blue" />
+                                  <span className="text-[10px] font-bold text-stone-600">{news.source}</span>
+                                  <ExternalLink size={8} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </a>
+                              ) : (
+                                <span
+                                  key={idx}
+                                  className="flex items-center gap-2 bg-white border border-stone-200 px-3 py-1.5 rounded-full shadow-sm"
+                                >
+                                  <Globe size={10} className="text-stone-300" />
+                                  <span className="text-[10px] font-bold text-stone-600">{news.source}</span>
+                                </span>
+                              )
                             ))}
                           </div>
                         </div>
@@ -684,21 +832,21 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* Markets & Industry Block */}
+                  {/* Relaciones Internacionales Block */}
                   <section className="space-y-4">
                     <h3 className="text-[11px] font-bold text-stone-400 tracking-[0.2em] flex items-center gap-2">
-                      <TrendingUp size={14} />
-                      Mercados e industria
+                      <Globe size={14} />
+                      RR. Internacionales
                     </h3>
                     <div className="bg-white border border-stone-100 rounded-2xl p-6 shadow-lg">
                       {latestReportForLocation && typeof latestReportForLocation.content !== 'string' ? (
                         <div className="markdown-body text-xs leading-relaxed">
                           <ReactMarkdown>
-                            {latestReportForLocation.content.mercados_industria}
+                            {latestReportForLocation.content.relaciones_internacionales}
                           </ReactMarkdown>
                         </div>
                       ) : (
-                        <p className="text-stone-400 text-xs italic">Sincronice para obtener análisis de mercados.</p>
+                        <p className="text-stone-400 text-xs italic">Sincronice para obtener análisis diplomático.</p>
                       )}
                     </div>
                   </section>
@@ -723,7 +871,7 @@ export default function App() {
               <section className="space-y-4">
                 <h3 className="text-[11px] font-bold text-stone-400 tracking-[0.2em] flex items-center gap-2">
                   <Radio size={14} />
-                  Noticias filtradas por área: {activeTab === "mercados_industria" ? "Mercados" : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                  Noticias filtradas por área: {activeTab === "relaciones_internacionales" ? "RR. Internacionales" : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {(() => {
@@ -731,7 +879,7 @@ export default function App() {
                       politico: ["política", "gobierno", "diplomacia", "acuerdo", "relaciones", "embajada", "presidente", "ministro", "canciller"],
                       economico: ["economía", "inversión", "comercio", "agropecuario", "infraestructura", "puerto", "mercado", "pib", "crecimiento"],
                       cultural: ["cultura", "arte", "exposición", "museo", "patrimonio", "unesco", "turismo", "evento"],
-                      mercados_industria: ["industria", "mercado", "cifras", "comercio", "exportación", "importación", "promperú", "sector"]
+                      relaciones_internacionales: ["CARICOM", "OEA", "diplomacia", "bilateral", "cooperación", "tratado", "SICA", "cancillería"]
                     };
                     const currentKeywords = keywords[activeTab] || [];
                     const filteredNews = (latestReportForLocation?.newsItems || []).filter(news => 
@@ -773,73 +921,175 @@ export default function App() {
           </div>
         ) : activeView === "monitoring" ? (
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-8 border-b border-stone-100 flex items-center justify-between bg-white/40 backdrop-blur-md">
-              <div className="relative w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
-                <input 
-                  type="text"
-                  placeholder="Buscar medio o ciudad..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-white border border-stone-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-mre-blue/20 focus:border-mre-blue transition-all shadow-sm"
-                />
+            {/* Header controls */}
+            <div className="p-6 border-b border-stone-100 bg-white/40 backdrop-blur-md space-y-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="relative w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Buscar medio, país o ciudad..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-white border border-stone-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-mre-blue/20 focus:border-mre-blue transition-all shadow-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCheckMediaStatus}
+                    disabled={isCheckingMedia}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-stone-200 rounded-full text-xs font-bold text-stone-600 hover:border-mre-blue/40 hover:text-mre-blue transition-all disabled:opacity-50 shadow-sm"
+                  >
+                    {isCheckingMedia ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
+                    Verificar en tiempo real
+                  </button>
+                  <button
+                    onClick={handleUpdateMediaDatabase}
+                    disabled={isUpdatingMedia}
+                    className="flex items-center gap-2 px-4 py-2 bg-mre-blue text-white rounded-full text-xs font-bold hover:bg-blue-800 transition-all disabled:opacity-50 shadow-sm"
+                  >
+                    {isUpdatingMedia ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                    Actualizar con IA — {location}
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div className="flex items-center gap-6 text-[11px] font-bold text-stone-500">
+                <span className="flex items-center gap-1.5">
+                  <Globe size={12} className="text-mre-blue" />
+                  <span className="text-stone-900">{mediaSources.length}</span> fuentes totales
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                  <span className="text-stone-900">{mediaSources.filter(s => s.status === "Activo").length}</span> activas
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                  <span className="text-stone-900">{mediaSources.filter(s => s.status === "Inactivo").length}</span> inactivas
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                  <span className="text-stone-900">{mediaSources.filter(s => s.status === "Verificando").length}</span> verificando
+                </span>
+                <span className="ml-auto flex items-center gap-1 text-stone-400">
+                  <Clock size={10} />
+                  Actualizado: {format(new Date(), "HH:mm:ss")}
+                </span>
+              </div>
+
+              {/* Country filter tabs */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setMediaCountryFilter("all")}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-bold tracking-wider transition-all",
+                    mediaCountryFilter === "all" ? "bg-mre-blue text-white" : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+                  )}
+                >
+                  Todos ({mediaSources.length})
+                </button>
+                {uniqueMediaCountries.map(country => (
+                  <button
+                    key={country}
+                    onClick={() => setMediaCountryFilter(country)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-[10px] font-bold tracking-wider transition-all",
+                      mediaCountryFilter === country ? "bg-mre-blue text-white" : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+                    )}
+                  >
+                    {country} ({mediaSources.filter(s => s.country === country).length})
+                  </button>
+                ))}
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-8">
               <div className="max-w-6xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredMedia.map((source) => (
-                    <div 
-                      key={source.id}
-                      className="bg-white border border-stone-200 rounded-xl p-6 hover:shadow-lg hover:border-mre-blue/20 transition-all group"
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-stone-50 rounded-lg group-hover:bg-mre-blue/5 transition-colors">
-                          <Globe className="text-stone-400 group-hover:text-mre-blue" size={20} />
-                        </div>
-                        <div className={cn(
-                          "px-2 py-1 rounded text-[10px] font-bold tracking-wider",
-                          source.status === "Activo" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                        )}>
-                          {source.status}
-                        </div>
-                      </div>
-                      
-                      <h3 className="font-bold text-stone-900 mb-1 flex items-center gap-2">
-                        {source.name}
-                        <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-stone-300 hover:text-mre-blue transition-colors">
-                          <ExternalLink size={14} />
-                        </a>
-                      </h3>
-                      <p className="text-xs text-stone-500 mb-4 flex items-center gap-1">
-                        <MapPin size={10} />
-                        {source.location}
-                      </p>
+                {filteredMedia.length === 0 ? (
+                  <div className="py-16 text-center text-stone-400">
+                    <Globe size={40} className="mx-auto mb-3 opacity-30" />
+                    <p className="text-sm font-medium">No se encontraron fuentes con ese criterio.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredMedia.map((source) => {
+                      const citedInReport = latestReportForLocation?.newsItems?.some(
+                        n => n.source.toLowerCase().includes(source.name.toLowerCase()) ||
+                             source.name.toLowerCase().includes(n.source.toLowerCase())
+                      );
+                      return (
+                        <div
+                          key={source.id}
+                          className="bg-white border border-stone-200 rounded-xl p-5 hover:shadow-lg hover:border-mre-blue/20 transition-all group"
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 bg-stone-50 rounded-lg group-hover:bg-mre-blue/5 transition-colors">
+                                <Globe className="text-stone-400 group-hover:text-mre-blue" size={18} />
+                              </div>
+                              <span className={cn(
+                                "text-[9px] font-bold tracking-widest px-2 py-0.5 rounded uppercase",
+                                source.type === "Diario" && "bg-blue-50 text-blue-600",
+                                source.type === "TV" && "bg-purple-50 text-purple-600",
+                                source.type === "Radio" && "bg-amber-50 text-amber-600",
+                                source.type === "Digital" && "bg-emerald-50 text-emerald-600",
+                              )}>
+                                {source.type}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {source.status === "Verificando" && (
+                                <Loader2 size={10} className="animate-spin text-amber-500" />
+                              )}
+                              <div className={cn(
+                                "w-2 h-2 rounded-full",
+                                source.status === "Activo" && "bg-green-500 animate-pulse",
+                                source.status === "Inactivo" && "bg-red-400",
+                                source.status === "Verificando" && "bg-amber-400"
+                              )} />
+                              <span className={cn(
+                                "text-[9px] font-bold tracking-wider",
+                                source.status === "Activo" && "text-green-600",
+                                source.status === "Inactivo" && "text-red-500",
+                                source.status === "Verificando" && "text-amber-500"
+                              )}>
+                                {source.status}
+                              </span>
+                            </div>
+                          </div>
 
-                      <div className="space-y-3 pt-4 border-t border-stone-50">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-stone-400 font-medium tracking-wider">Tipo</span>
-                          <span className="text-stone-700 font-semibold">{source.type}</span>
+                          <h3 className="font-bold text-stone-900 mb-0.5 flex items-center gap-2 text-sm">
+                            {source.name}
+                            <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-stone-300 hover:text-mre-blue transition-colors">
+                              <ExternalLink size={12} />
+                            </a>
+                          </h3>
+                          <p className="text-[10px] text-stone-400 mb-3 flex items-center gap-1">
+                            <MapPin size={9} />
+                            {source.country} — {source.location}
+                          </p>
+
+                          <div className="space-y-2 pt-3 border-t border-stone-50">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-stone-400 tracking-wider">Última verificación</span>
+                              <span className="text-stone-600 font-semibold flex items-center gap-1">
+                                <Clock size={9} />
+                                {format(new Date(source.lastCheck), "dd/MM HH:mm", { locale: es })}
+                              </span>
+                            </div>
+                            {citedInReport && (
+                              <div className="flex items-center gap-1.5 text-[9px] font-bold text-green-700 bg-green-50 px-2 py-1 rounded-md">
+                                <CheckCircle2 size={10} />
+                                Citado en último reporte
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-stone-400 font-medium tracking-wider">Última sincronización</span>
-                          <span className="text-stone-700 font-semibold flex items-center gap-1">
-                            <Clock size={10} />
-                            {format(new Date(source.lastCheck), "HH:mm", { locale: es })}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-stone-400 font-medium tracking-wider">Conexión API</span>
-                          <span className="text-green-600 font-semibold flex items-center gap-1">
-                            <CheckCircle2 size={10} />
-                            Estable
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -850,18 +1100,18 @@ export default function App() {
                 <div className="px-8 py-4 border-b border-stone-100 flex items-center justify-between bg-white/40 backdrop-blur-md">
                   <div className="flex items-center gap-4">
                     <div className="flex bg-stone-100 p-1 rounded-xl overflow-x-auto max-w-2xl">
-                      {(["politico", "economico", "cultural", "mercados_industria", "panorama_general"] as const).map((tab) => (
+                      {(["politico", "economico", "cultural", "relaciones_internacionales", "panorama_general"] as const).map((tab) => (
                         <button
                           key={tab}
-                          onClick={() => setActiveTab(tab as any)}
+                          onClick={() => setActiveTab(tab)}
                           className={cn(
                             "px-4 py-1.5 rounded-lg text-[10px] font-bold tracking-widest transition-all whitespace-nowrap",
-                            activeTab === tab 
-                              ? "bg-white text-mre-blue shadow-sm" 
+                            activeTab === tab
+                              ? "bg-white text-mre-blue shadow-sm"
                               : "text-stone-400 hover:text-stone-600"
                           )}
                         >
-                          {tab === "panorama_general" ? "Panorama General" : tab === "mercados_industria" ? "Mercados e industria" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                          {tab === "panorama_general" ? "Panorama General" : tab === "relaciones_internacionales" ? "RR. Internacionales" : tab.charAt(0).toUpperCase() + tab.slice(1)}
                         </button>
                       ))}
                     </div>
@@ -889,9 +1139,7 @@ export default function App() {
                     <div className="mb-8 flex flex-wrap gap-2 items-center">
                       <span className="text-[10px] font-black text-stone-400 tracking-widest uppercase mr-2">Palabras clave:</span>
                       {getMostFrequentWords(
-                        typeof selectedReport.content === 'string' 
-                          ? selectedReport.content 
-                          : (selectedReport.content as any)[activeTab]
+                        getReportContent(selectedReport.content, activeTab)
                       ).map(({ word, count }, i) => (
                         <div key={i} className="flex items-center gap-1.5 bg-stone-100 border border-stone-200 px-2 py-1 rounded-md">
                           <span className="text-[10px] font-bold text-stone-700">{word}</span>
@@ -900,9 +1148,7 @@ export default function App() {
                       ))}
                     </div>
                     <ReactMarkdown>
-                      {typeof selectedReport.content === 'string' 
-                        ? selectedReport.content 
-                        : (selectedReport.content as any)[activeTab]}
+                      {getReportContent(selectedReport.content, activeTab)}
                     </ReactMarkdown>
                   </div>
 
@@ -931,14 +1177,16 @@ export default function App() {
                                   <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">{news.preview}</p>
                                 </div>
                               </div>
-                              <a 
-                                href={news.url || "#"} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="p-2 text-stone-300 hover:text-mre-blue hover:bg-mre-blue/5 rounded-full transition-all"
-                              >
-                                <ChevronRight size={20} />
-                              </a>
+                              {news.url && (
+                                <a
+                                  href={news.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 text-stone-300 hover:text-mre-blue hover:bg-mre-blue/5 rounded-full transition-all"
+                                >
+                                  <ChevronRight size={20} />
+                                </a>
+                              )}
                             </div>
                           </div>
                         ))}

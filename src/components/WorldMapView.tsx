@@ -39,7 +39,19 @@ export default function WorldMapView({ onLocationSelect }: WorldMapViewProps) {
     const countryMap: Record<string, { country: string, locationName: string }> = {
       "Mexico": { country: "México", locationName: "Ciudad de México" },
       "San Marino": { country: "San Marino", locationName: "San Marino" },
-      "Bhutan": { country: "Bután", locationName: "Bután" }
+      "Bhutan": { country: "Bután", locationName: "Timbu" },
+      "Spain": { country: "España", locationName: "Madrid" },
+      "Belize": { country: "Belice", locationName: "Belmopán" },
+      "Haiti": { country: "Haití", locationName: "Puerto Príncipe" },
+      "The Bahamas": { country: "Bahamas", locationName: "Nasáu" },
+      "Suriname": { country: "Surinam", locationName: "Paramaribo" },
+      "Antigua and Barbuda": { country: "Antigua y Barbuda", locationName: "Saint John's" },
+      "Barbados": { country: "Barbados", locationName: "Bridgetown" },
+      "Dominica": { country: "Dominica", locationName: "Roseau" },
+      "Grenada": { country: "Granada", locationName: "Saint George's" },
+      "Saint Kitts and Nevis": { country: "San Cristóbal y Nieves", locationName: "Basseterre" },
+      "Saint Lucia": { country: "Santa Lucía", locationName: "Castries" },
+      "Saint Vincent and the Grenadines": { country: "San Vicente y las Granadinas", locationName: "Kingstown" },
     };
 
     // Load world data
