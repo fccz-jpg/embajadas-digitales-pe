@@ -4,17 +4,24 @@ export interface NewsItem {
   preview: string;
   date: string;
   url?: string;
+  category?: "politico" | "economico" | "cultural" | "relaciones_internacionales";
 }
+
+export type ReportCategory = "politico" | "economico" | "cultural" | "relaciones_internacionales";
 
 export interface Report {
   id: string;
   location: string;
+  category?: ReportCategory;
   content: {
-    politico: string;
-    economico: string;
-    cultural: string;
-    relaciones_internacionales: string;
-    panorama_general: string;
+    // New per-category format
+    text?: string;
+    // Legacy multi-section format
+    politico?: string;
+    economico?: string;
+    cultural?: string;
+    relaciones_internacionales?: string;
+    panorama_general?: string;
     sources?: {
       title: string;
       source: string;
@@ -23,7 +30,7 @@ export interface Report {
     }[];
   } | string;
   createdAt: string;
-  rawNews: string;
+  rawNews?: string;
   newsItems?: NewsItem[];
 }
 

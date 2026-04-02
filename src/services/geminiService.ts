@@ -191,7 +191,9 @@ export const mockMediaSources: MediaSource[] = [
 
 ];
 
-export async function generateEmbassyReport(location: string, _searchQuery: string) {
+import type { Report } from "../types";
+
+export async function generateEmbassyReport(location: string, _searchQuery: string): Promise<Report[]> {
   const res = await fetch("/api/report", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

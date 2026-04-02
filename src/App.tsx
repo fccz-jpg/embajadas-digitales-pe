@@ -36,13 +36,49 @@ import { cn, getMostFrequentWords } from "./lib/utils";
 import { generateEmbassyReport, generateMediaDatabase, mockNews, mockMediaSources, mockCountryData } from "./services/geminiService";
 import { Report, MediaSource, EMBASSIES } from "./types";
 
-// Type-safe accessor for report content sections
+function getFavicon(url?: string): string | null {
+  if (!url) return null;
+  try {
+    const domain = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch {
+    return null;
+  }
+}
+
+const TAB_KEYWORDS: Record<string, string[]> = {
+  politico: ["política", "gobierno", "gobernanza", "estabilidad", "presidente", "ministro", "parlamento", "elección", "partido", "constitución"],
+  economico: ["economía", "económic", "inversión", "comercio", "inflación", "pib", "crecimiento", "mercado", "empresa", "industria", "finanza"],
+  cultural: ["cultura", "cultural", "arte", "artíst", "exposición", "museo", "patrimonio", "unesco", "turismo", "evento", "festival", "educación"],
+  relaciones_internacionales: ["diplomaci", "bilateral", "caricom", "oea", "sica", "onu", "cooperación", "tratado", "cancillería", "embajada", "internacional"],
+};
+
+function inferCategory(item: { title: string; preview?: string; category?: string | null }): string | null {
+  if (item.category) return item.category;
+  const text = `${item.title} ${item.preview ?? ""}`.toLowerCase();
+  for (const [cat, kws] of Object.entries(TAB_KEYWORDS)) {
+    if (kws.some(k => text.includes(k))) return cat;
+  }
+  return null;
+}
+
+// Get the display text for a report (handles new per-category format + legacy multi-section format)
+function getReportText(report: Report | undefined, tab: string): string {
+  if (!report) return "";
+  const c = report.content;
+  if (typeof c === "string") return c;
+  if (c.text) return c.text;
+  return (c as Record<string, string>)[tab] ?? "";
+}
+
+// Type-safe accessor for report content sections (legacy)
 function getReportContent(
   content: Report["content"],
   tab: "politico" | "economico" | "cultural" | "relaciones_internacionales" | "panorama_general"
 ): string {
   if (typeof content === "string") return content;
-  return content[tab] ?? "";
+  if ((content as {text?: string}).text) return (content as {text: string}).text;
+  return (content as Record<string, string>)[tab] ?? "";
 }
 
 // Real-time status check via no-cors fetch (checks if server responds)
@@ -112,10 +148,16 @@ export default function App() {
     setIsGenerating(true);
     setError(null);
     try {
-      const newReport: Report = await generateEmbassyReport(location, location);
-      const updatedReports = [newReport, ...reports.filter(r => r.location !== location)];
-      saveReports(updatedReports);
-      setSelectedReport(newReport);
+      const newReports: Report[] = await generateEmbassyReport(location, location);
+      const updatedCategories = new Set(newReports.map(r => r.category).filter(Boolean));
+      setReports(prev => {
+        const filtered = prev.filter(r =>
+          !(r.location === location && r.category && updatedCategories.has(r.category))
+        );
+        const result = [...newReports, ...filtered];
+        localStorage.setItem("mre_reports", JSON.stringify(result));
+        return result;
+      });
       setActiveView("dashboard");
     } catch (err) {
       setError("Error al actualizar el monitoreo. Verifique su conexión e intente de nuevo.");
@@ -123,7 +165,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [location, reports]);
+  }, [location]);
 
   // Keep a ref to the latest handleUpdateMonitoring to avoid stale closure in interval
   const handleUpdateMonitoringRef = useRef(handleUpdateMonitoring);
@@ -187,6 +229,10 @@ export default function App() {
   const uniqueMediaCountries = [...new Set(mediaSources.map(s => s.country))].sort();
 
   const latestReportForLocation = reports.find(r => r.location === location);
+  // Per-category report (new format) — falls back to combined report (legacy format)
+  const activeTabReport =
+    reports.find(r => r.location === location && r.category === activeTab)
+    ?? reports.find(r => r.location === location && !r.category);
 
   const viewNames: Record<View, string> = {
     home: "Inicio",
@@ -492,7 +538,7 @@ export default function App() {
                         Análisis estratégico
                       </h3>
                     </div>
-                    {latestReportForLocation ? (
+                    {activeTabReport ? (
                       <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col">
                         {/* Analysis Tabs as Fields at the top */}
                         <div className="flex border-b border-stone-100 overflow-hidden">
@@ -587,7 +633,7 @@ export default function App() {
                               <span className={cn(
                                 "text-[8px] font-bold tracking-widest uppercase",
                                 activeTab === "politico" ? "text-blue-600" : "text-stone-300"
-                              )}>ID: {latestReportForLocation.id.slice(0, 8)}</span>
+                              )}>ID: {activeTabReport.id.slice(0, 8)}</span>
                             </div>
                             <h1 className={cn(
                               "text-3xl font-black tracking-tighter mb-1",
@@ -607,17 +653,17 @@ export default function App() {
                               activeTab === "politico" ? "text-blue-300" : "text-mre-blue"
                             )}>
                               <ExternalLink size={12} />
-                              {latestReportForLocation.newsItems?.[0]?.url ? (
+                              {activeTabReport.newsItems?.[0]?.url ? (
                                 <a
-                                  href={latestReportForLocation.newsItems[0].url}
+                                  href={activeTabReport.newsItems[0].url}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="hover:underline"
                                 >
-                                  Fuente: {latestReportForLocation.newsItems[0].source}
+                                  Fuente: {activeTabReport.newsItems[0].source}
                                 </a>
                               ) : (
-                                <span>Fuente: {latestReportForLocation.newsItems?.[0]?.source || "Monitoreo Global"}</span>
+                                <span>Fuente: {activeTabReport.newsItems?.[0]?.source || "Monitoreo Global"}</span>
                               )}
                             </div>
                           </div>
@@ -627,7 +673,7 @@ export default function App() {
                             <div className="lg:col-span-3">
                               <div className="markdown-body prose prose-stone max-w-none">
                                 <ReactMarkdown>
-                                  {getReportContent(latestReportForLocation.content, activeTab)}
+                                  {getReportText(activeTabReport, activeTab)}
                                 </ReactMarkdown>
                               </div>
                             </div>
@@ -695,7 +741,7 @@ export default function App() {
                                 </p>
                                 <div className="flex flex-wrap gap-2">
                                   {getMostFrequentWords(
-                                    getReportContent(latestReportForLocation.content, activeTab)
+                                    getReportText(activeTabReport, activeTab)
                                   ).map(({ word, count }, i) => (
                                     <div key={i} className="flex items-center gap-1.5 bg-white border border-stone-200 px-2 py-1 rounded-md shadow-sm">
                                       <span className="text-[10px] font-bold text-stone-700">{word}</span>
@@ -709,46 +755,102 @@ export default function App() {
                         </div>
                         </div>
 
-                        {/* News Sources used for this report */}
-                        <div className="bg-stone-50/80 border-t border-stone-100 p-6">
-                          <p className="text-[9px] font-black text-stone-400 tracking-[0.2em] mb-4 flex items-center gap-2">
-                            <Radio size={12} />
-                            Fuentes Utilizadas en este Análisis (Tiempo Real)
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {latestReportForLocation.newsItems?.map((news, idx) => (
-                              news.url ? (
-                                <a
-                                  key={idx}
-                                  href={news.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 bg-white border border-stone-200 px-3 py-1.5 rounded-full shadow-sm hover:border-mre-blue/30 transition-all group"
-                                >
-                                  <Globe size={10} className="text-stone-300 group-hover:text-mre-blue" />
-                                  <span className="text-[10px] font-bold text-stone-600">{news.source}</span>
-                                  <ExternalLink size={8} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </a>
-                              ) : (
-                                <span
-                                  key={idx}
-                                  className="flex items-center gap-2 bg-white border border-stone-200 px-3 py-1.5 rounded-full shadow-sm"
-                                >
-                                  <Globe size={10} className="text-stone-300" />
-                                  <span className="text-[10px] font-bold text-stone-600">{news.source}</span>
-                                </span>
-                              )
-                            ))}
-                          </div>
-                        </div>
+                        {/* 7-day accumulated news for active tab */}
+                        {(() => {
+                          const sevenDaysAgo = new Date();
+                          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                          const seen = new Set<string>();
+                          // Primary: category-specific reports in last 7 days
+                          const catItems = reports
+                            .filter(r => r.location === location && r.category === activeTab && new Date(r.createdAt) >= sevenDaysAgo)
+                            .flatMap(r => (r.newsItems ?? []).map(n => ({ ...n, reportDate: r.createdAt })))
+                            .filter(item => {
+                              const key = item.url || item.title;
+                              if (seen.has(key)) return false;
+                              seen.add(key);
+                              return true;
+                            });
+                          // Fallback: legacy reports (no category), keyword-filtered
+                          const legacyItems = catItems.length === 0
+                            ? reports
+                                .filter(r => r.location === location && !r.category && new Date(r.createdAt) >= sevenDaysAgo)
+                                .flatMap(r => (r.newsItems ?? []).map(n => ({ ...n, reportDate: r.createdAt })))
+                                .filter(item => {
+                                  const key = item.url || item.title;
+                                  if (seen.has(key)) return false;
+                                  seen.add(key);
+                                  return inferCategory(item) === activeTab;
+                                })
+                            : [];
+                          const accumulated = [...catItems, ...legacyItems];
+
+                          if (accumulated.length === 0) return null;
+
+                          const tabColor: Record<string, string> = {
+                            politico: "border-blue-950",
+                            economico: "border-amber-400",
+                            cultural: "border-violet-500",
+                            relaciones_internacionales: "border-teal-500",
+                          };
+                          const tabBadge: Record<string, string> = {
+                            politico: "bg-blue-950 text-white",
+                            economico: "bg-amber-100 text-amber-800",
+                            cultural: "bg-violet-100 text-violet-800",
+                            relaciones_internacionales: "bg-teal-100 text-teal-800",
+                          };
+
+                          return (
+                            <div className="border-t border-stone-100 p-6 bg-stone-50/60">
+                              <p className="text-[9px] font-black text-stone-400 tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <Radio size={12} />
+                                Noticias monitoreadas — últimos 7 días
+                              </p>
+                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                                {accumulated.map((news, idx) => {
+                                  const favicon = getFavicon(news.url);
+                                  return (
+                                    <div key={idx} className={`bg-white border border-stone-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-l-4 ${tabColor[activeTab] ?? "border-mre-blue"}`}>
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                          {favicon ? (
+                                            <img src={favicon} alt="" className="w-4 h-4 rounded-sm" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                                          ) : (
+                                            <Globe size={12} className="text-stone-300" />
+                                          )}
+                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded tracking-widest ${tabBadge[activeTab] ?? "bg-blue-50 text-blue-800"}`}>
+                                            {news.source}
+                                          </span>
+                                        </div>
+                                        <span className="text-[9px] text-stone-400 font-medium">
+                                          {news.date || format(new Date(news.reportDate), "dd/MM", { locale: es })}
+                                        </span>
+                                      </div>
+                                      <h4 className="text-xs font-bold text-stone-900 leading-snug mb-1">
+                                        {news.url ? (
+                                          <a href={news.url} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-start gap-1">
+                                            {news.title}
+                                            <ExternalLink size={10} className="shrink-0 mt-0.5 opacity-40" />
+                                          </a>
+                                        ) : news.title}
+                                      </h4>
+                                      {news.preview && news.preview !== news.title && (
+                                        <p className="text-[10px] text-stone-500 leading-relaxed line-clamp-2">{news.preview}</p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         <div className="px-8 py-4 bg-white border-t border-stone-100 flex justify-between items-center">
                           <span className="text-[10px] font-bold text-stone-400 tracking-widest">
-                            Generado el {format(new Date(latestReportForLocation.createdAt), "PPP", { locale: es })}
+                            Generado el {format(new Date(activeTabReport.createdAt), "PPP", { locale: es })}
                           </span>
-                          <button 
+                          <button
                             onClick={() => {
-                              setSelectedReport(latestReportForLocation);
+                              setSelectedReport(activeTabReport);
                               setActiveView("reports");
                             }}
                             className="text-[10px] font-bold text-mre-blue hover:underline tracking-widest"
@@ -864,56 +966,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* News of the Day List */}
-              <section className="space-y-4">
-                <h3 className="text-[11px] font-bold text-stone-400 tracking-[0.2em] flex items-center gap-2">
-                  <Radio size={14} />
-                  Noticias filtradas por área: {activeTab === "relaciones_internacionales" ? "RR. Internacionales" : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(() => {
-                    const keywords: Record<string, string[]> = {
-                      politico: ["política", "gobierno", "diplomacia", "acuerdo", "relaciones", "embajada", "presidente", "ministro", "canciller"],
-                      economico: ["economía", "inversión", "comercio", "agropecuario", "infraestructura", "puerto", "mercado", "pib", "crecimiento"],
-                      cultural: ["cultura", "arte", "exposición", "museo", "patrimonio", "unesco", "turismo", "evento"],
-                      relaciones_internacionales: ["CARICOM", "OEA", "diplomacia", "bilateral", "cooperación", "tratado", "SICA", "cancillería"]
-                    };
-                    const currentKeywords = keywords[activeTab] || [];
-                    const filteredNews = (latestReportForLocation?.newsItems || []).filter(news => 
-                      currentKeywords.some(k => 
-                        news.title.toLowerCase().includes(k) || 
-                        (news.preview && news.preview.toLowerCase().includes(k))
-                      ) || currentKeywords.length === 0
-                    );
-
-                    if (filteredNews.length === 0) {
-                      return (
-                        <div className="col-span-full py-8 text-center bg-stone-50/50 border border-dashed border-stone-200 rounded-xl">
-                          <p className="text-[10px] font-bold text-stone-400 tracking-widest uppercase">No se encontraron noticias específicas para esta área hoy</p>
-                        </div>
-                      );
-                    }
-
-                    return filteredNews.map((news, idx) => (
-                      <div key={idx} className="bg-white border border-stone-100 rounded-xl p-5 shadow-md hover:shadow-lg transition-all border-l-4 border-l-mre-blue animate-in fade-in zoom-in-95 duration-300">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-[10px] font-bold text-mre-blue tracking-widest">{news.source}</span>
-                          <span className="text-[10px] text-stone-400 font-medium">{news.date || "Hoy"}</span>
-                        </div>
-                        <h4 className="font-bold text-stone-900 text-sm mb-2 leading-snug">
-                          {news.url ? (
-                            <a href={news.url} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-2">
-                              {news.title}
-                              <ExternalLink size={12} className="opacity-50" />
-                            </a>
-                          ) : news.title}
-                        </h4>
-                        <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">{news.preview}</p>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </section>
             </div>
           </div>
         ) : activeView === "monitoring" ? (
@@ -1243,20 +1295,10 @@ export default function App() {
                             const allNewsItems = selectedCountries.flatMap(c => mockNews[c as keyof typeof mockNews] || []);
                             const newsString = allNewsItems.map(n => `- ${n.source}: ${n.title}`).join("\n");
                             
-                            const content = await generateEmbassyReport(targetLocation, newsString);
-                            
-                            const newReport: Report = {
-                              id: crypto.randomUUID(),
-                              location: targetLocation,
-                              content,
-                              createdAt: new Date().toISOString(),
-                              rawNews: newsString,
-                              newsItems: allNewsItems
-                            };
-
-                            const updatedReports = [newReport, ...reports];
+                            const newReports = await generateEmbassyReport(targetLocation, newsString);
+                            const updatedReports = [...newReports, ...reports];
                             saveReports(updatedReports);
-                            setSelectedReport(newReport);
+                            setSelectedReport(newReports[0] ?? null);
                             setSelectedCountries([]);
                           } catch (error) {
                             console.error("Analysis failed", error);

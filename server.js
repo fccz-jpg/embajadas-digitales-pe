@@ -24,14 +24,20 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS reports (
       id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
       location    TEXT         NOT NULL,
+      category    TEXT,
       content     JSONB        NOT NULL,
       raw_news    TEXT,
       news_items  JSONB,
       created_at  TIMESTAMPTZ  DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_reports_location    ON reports (location);
+    CREATE INDEX IF NOT EXISTS idx_reports_loc_cat     ON reports (location, category, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_reports_created_at  ON reports (created_at DESC);
   `);
+  // Add category column if table already exists without it
+  await pool.query(`
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS category TEXT;
+  `).catch(() => {});
   console.log("Base de datos lista.");
 }
 
@@ -44,31 +50,59 @@ function getAI() {
   return new GoogleGenAI({ apiKey: key });
 }
 
-async function generateAndSave(location) {
-  const prompt = `
-    Actúa como un analista de inteligencia estratégica para el Ministerio de Relaciones Exteriores (MRE) de Perú.
-    Genera un monitoreo de medios estructurado para la Embajada Digital en ${location}.
+// ── Category configs ────────────────────────────────────────────────────────
+const CATEGORIES = {
+  politico: {
+    label: "Político",
+    focus: "política interna, gobernanza, estabilidad gubernamental, partidos políticos, elecciones y seguridad pública",
+    searchTerms: "política gobierno estabilidad",
+  },
+  economico: {
+    label: "Económico",
+    focus: "economía, finanzas, mercados, comercio exterior, inversión, inflación, crecimiento del PIB y sectores productivos clave",
+    searchTerms: "economía finanzas mercados comercio",
+  },
+  cultural: {
+    label: "Cultural",
+    focus: "cultura, arte, turismo, sociedad, educación, medios de comunicación y tendencias sociales",
+    searchTerms: "cultura arte turismo sociedad eventos",
+  },
+  relaciones_internacionales: {
+    label: "Relaciones Internacionales",
+    focus: "relaciones diplomáticas, acuerdos bilaterales y multilaterales, organismos internacionales (OEA, CARICOM, ONU, SICA, etc.) y agenda exterior",
+    searchTerms: "diplomacia relaciones internacionales organismos multilaterales",
+  },
+};
 
-    INSTRUCCIONES:
-    1. Realiza una búsqueda exhaustiva de noticias recientes (últimas 24-48 horas) relacionadas con la situación actual en ${location}.
-    2. Analiza la información encontrada y sepárala en 5 secciones.
-    3. Cada sección debe ser una nota distinta y completa.
+// ── Generate one category report ────────────────────────────────────────────
+async function generateCategoryReport(location, category) {
+  const { label, focus } = CATEGORIES[category];
 
-    SECCIONES:
-    - politico: Análisis de política interna, gobernanza y estabilidad.
-    - economico: Análisis de la situación económica general, inflación, crecimiento y sectores clave.
-    - cultural: Análisis de la vida cultural, eventos sociales y tendencias de la sociedad.
-    - relaciones_internacionales: Análisis de relaciones diplomáticas, organismos internacionales y agenda bilateral.
-    - panorama_general: Un resumen ejecutivo del panorama general del país en el periodo monitoreado.
+  const prompt = `Actúa como analista de inteligencia estratégica del Ministerio de Relaciones Exteriores (MRE) de Perú.
 
-    REQUISITOS DE FORMATO:
-    - Usa Markdown para el formato.
-    - Cada sección debe comenzar con un título descriptivo.
-    - Usa negritas para resaltar datos clave, cifras y nombres de medios.
-    - El tono debe ser profesional, analítico y de alta dirección.
-    - NO realices comparaciones o cruces con Perú. Enfócate exclusivamente en ${location}.
-    - Si no hay reportes relevantes indica: "Sin reportes relevantes en los medios monitoreados durante el presente periodo."
-  `;
+Genera un informe ${label} completo y detallado sobre ${location}.
+
+ENFOQUE EXCLUSIVO: ${focus}
+
+INSTRUCCIONES:
+1. Busca y analiza las noticias más recientes (últimas 24-48 horas) sobre este tema en ${location}.
+2. Redacta un análisis estructurado que incluya:
+   - Contexto y situación actual
+   - Hechos y eventos relevantes del período monitoreado
+   - Actores clave y sus posiciones
+   - Tendencias identificadas
+   - Perspectivas a corto plazo
+3. Extensión mínima: 400 palabras de análisis.
+
+FORMATO:
+- Usa Markdown. Comienza con un título ## descriptivo.
+- Usa **negritas** para resaltar datos clave, cifras, fechas y nombres de medios.
+- Usa listas con viñetas para enumerar hechos concretos.
+- Tono profesional, analítico y de alta dirección.
+- NO compares con Perú ni hagas referencias a relaciones bilaterales con Perú. Enfócate exclusivamente en ${location}.
+- Si no hay noticias relevantes en el período: indica "Sin reportes relevantes en los medios monitoreados durante el presente período."
+
+Para cada fuente utilizada: proporciona el título exacto del artículo, nombre del medio, URL activa, fecha de publicación y una descripción breve de 1-2 oraciones del contenido.`;
 
   const ai = getAI();
   const response = await ai.models.generateContent({
@@ -80,80 +114,116 @@ async function generateAndSave(location) {
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          politico:                  { type: Type.STRING },
-          economico:                 { type: Type.STRING },
-          cultural:                  { type: Type.STRING },
-          relaciones_internacionales:{ type: Type.STRING },
-          panorama_general:          { type: Type.STRING },
+          text: { type: Type.STRING },
           sources: {
             type: Type.ARRAY,
             items: {
               type: Type.OBJECT,
               properties: {
-                title:  { type: Type.STRING },
-                source: { type: Type.STRING },
-                url:    { type: Type.STRING },
-                date:   { type: Type.STRING },
-              }
-            }
-          }
+                title:   { type: Type.STRING },
+                source:  { type: Type.STRING },
+                url:     { type: Type.STRING },
+                date:    { type: Type.STRING },
+                preview: { type: Type.STRING },
+              },
+            },
+          },
         },
-        required: ["politico", "economico", "cultural", "relaciones_internacionales", "panorama_general", "sources"],
+        required: ["text", "sources"],
       },
     },
   });
 
   const content = JSON.parse(response.text);
   const newsItems = (content.sources ?? []).map(s => ({
-    title: s.title, source: s.source, preview: s.title, date: s.date, url: s.url,
+    title:    s.title,
+    source:   s.source,
+    preview:  s.preview || s.title,
+    date:     s.date,
+    url:      s.url,
+    category,
   }));
 
   const { rows } = await pool.query(
-    `INSERT INTO reports (location, content, raw_news, news_items)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, location, content, raw_news, news_items, created_at`,
-    [location, JSON.stringify(content), "Real-time via Google Grounding", JSON.stringify(newsItems)]
+    `INSERT INTO reports (location, category, content, raw_news, news_items)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, location, category, content, news_items, created_at`,
+    [location, category, JSON.stringify({ text: content.text, sources: content.sources }), "Real-time via Google Grounding", JSON.stringify(newsItems)]
   );
 
   const r = rows[0];
-  return { id: r.id, location: r.location, content: r.content, createdAt: r.created_at, rawNews: r.raw_news, newsItems: r.news_items };
+  return {
+    id:        r.id,
+    location:  r.location,
+    category:  r.category,
+    content:   r.content,
+    createdAt: r.created_at,
+    newsItems: r.news_items,
+  };
 }
 
 // ── API routes ──────────────────────────────────────────────────────────────
 
-// Generar reporte para un país
+// Generar los 4 reportes de categoría para un país
 app.post("/api/report", async (req, res) => {
-  const { location } = req.body;
+  const { location, category } = req.body;
   if (!location) return res.status(400).json({ error: "location requerido" });
+
+  const cats = category
+    ? [category]
+    : ["politico", "economico", "cultural", "relaciones_internacionales"];
+
   try {
-    const report = await generateAndSave(location);
-    res.json(report);
+    const results = [];
+    for (const cat of cats) {
+      try {
+        const report = await generateCategoryReport(location, cat);
+        results.push(report);
+        if (cats.length > 1) await new Promise(r => setTimeout(r, 2000));
+      } catch (err) {
+        console.error(`Error generando ${cat} para ${location}:`, err.message);
+      }
+    }
+    if (results.length === 0) return res.status(500).json({ error: "No se pudo generar ningún reporte" });
+    res.json(results);
   } catch (err) {
     console.error("Error generando reporte:", err.message);
     res.status(500).json({ error: "Error al generar el reporte" });
   }
 });
 
-// Obtener reportes (último por país, o histórico de un país)
+// Obtener reportes (último por país+categoría, o histórico)
 app.get("/api/reports", async (req, res) => {
-  const { location } = req.query;
+  const { location, category } = req.query;
   try {
     let result;
-    if (location) {
+    if (location && category) {
       result = await pool.query(
-        `SELECT id, location, content, raw_news, news_items, created_at
-         FROM reports WHERE location = $1 ORDER BY created_at DESC LIMIT 50`,
+        `SELECT id, location, category, content, raw_news, news_items, created_at
+         FROM reports WHERE location = $1 AND category = $2 ORDER BY created_at DESC LIMIT 50`,
+        [location, category]
+      );
+    } else if (location) {
+      result = await pool.query(
+        `SELECT DISTINCT ON (COALESCE(category, 'legacy')) id, location, category, content, raw_news, news_items, created_at
+         FROM reports WHERE location = $1
+         ORDER BY COALESCE(category, 'legacy'), created_at DESC`,
         [location]
       );
     } else {
       result = await pool.query(
-        `SELECT DISTINCT ON (location) id, location, content, raw_news, news_items, created_at
-         FROM reports ORDER BY location, created_at DESC`
+        `SELECT DISTINCT ON (location, COALESCE(category, 'legacy')) id, location, category, content, raw_news, news_items, created_at
+         FROM reports ORDER BY location, COALESCE(category, 'legacy'), created_at DESC`
       );
     }
     res.json(result.rows.map(r => ({
-      id: r.id, location: r.location, content: r.content,
-      createdAt: r.created_at, rawNews: r.raw_news, newsItems: r.news_items,
+      id:        r.id,
+      location:  r.location,
+      category:  r.category,
+      content:   r.content,
+      createdAt: r.created_at,
+      rawNews:   r.raw_news,
+      newsItems: r.news_items,
     })));
   } catch (err) {
     console.error("Error leyendo reportes:", err.message);
@@ -189,21 +259,21 @@ app.post("/api/media", async (req, res) => {
               type: { type: Type.STRING },
               url:  { type: Type.STRING },
             },
-            required: ["name", "type", "url"]
-          }
+            required: ["name", "type", "url"],
+          },
         },
       },
     });
 
     const validTypes = ["Diario", "Radio", "TV", "Digital"];
     const sources = JSON.parse(response.text).map((s, i) => ({
-      id: `gen_${Date.now()}_${i}`,
-      name: s.name,
-      country: location,
+      id:        `gen_${Date.now()}_${i}`,
+      name:      s.name,
+      country:   location,
       location,
-      type: validTypes.includes(s.type) ? s.type : "Digital",
-      url: s.url,
-      status: "Activo",
+      type:      validTypes.includes(s.type) ? s.type : "Digital",
+      url:       s.url,
+      status:    "Activo",
       lastCheck: new Date().toISOString(),
     }));
     res.json(sources);
@@ -224,12 +294,14 @@ const LOCATIONS = [
 cron.schedule("0 12 * * *", async () => {
   console.log(`[${new Date().toISOString()}] Iniciando generación diaria...`);
   for (const loc of LOCATIONS) {
-    try {
-      await generateAndSave(loc);
-      console.log(`  ✓ ${loc}`);
-      await new Promise(r => setTimeout(r, 4000)); // pausa entre requests
-    } catch (err) {
-      console.error(`  ✗ ${loc}: ${err.message}`);
+    for (const cat of ["politico", "economico", "cultural", "relaciones_internacionales"]) {
+      try {
+        await generateCategoryReport(loc, cat);
+        console.log(`  ✓ ${loc} / ${cat}`);
+        await new Promise(r => setTimeout(r, 3000));
+      } catch (err) {
+        console.error(`  ✗ ${loc}/${cat}: ${err.message}`);
+      }
     }
   }
   console.log(`[${new Date().toISOString()}] Generación diaria completada.`);
