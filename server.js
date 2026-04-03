@@ -79,27 +79,6 @@ const LOCATION_FEEDS = {
       { url: "https://www.proceso.com.mx/rss/", name: "Proceso" },
     ],
   },
-  "Madrid": {
-    politico: [
-      { url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/espana/portada", name: "El País España" },
-      { url: "https://e00-elmundo.uecdn.es/elmundo/rss/espana.xml", name: "El Mundo España" },
-      { url: "https://www.lavanguardia.com/rss/politica.xml", name: "La Vanguardia" },
-      { url: "https://www.publico.es/rss/", name: "Público" },
-    ],
-    economico: [
-      { url: "https://e00-expansion.uecdn.es/rss/mercados.xml", name: "Expansión Mercados" },
-      { url: "https://www.eleconomista.es/rss/rss-seleccion-ee.php", name: "El Economista ES" },
-      { url: "https://cincodias.elpais.com/rss/cincodias/ultima_hora.xml", name: "Cinco Días" },
-    ],
-    cultural: [
-      { url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/cultura/portada", name: "El País Cultura" },
-      { url: "https://www.elmundo.es/rss/cultura.xml", name: "El Mundo Cultura" },
-    ],
-    relaciones_internacionales: [
-      { url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/internacional/portada", name: "El País Internacional" },
-      { url: "https://e00-elmundo.uecdn.es/elmundo/rss/internacional.xml", name: "El Mundo Internacional" },
-    ],
-  },
   "San Marino": {
     politico: [
       { url: "https://www.sanmarinortv.sm/rss/news.rss", name: "San Marino RTV" },
@@ -199,21 +178,6 @@ const LOCATION_FEEDS = {
     relaciones_internacionales: [
       { url: "https://edition.channel5belize.com/feed/", name: "Channel 5 Belize" },
       { url: "https://amandala.com.bz/news/feed/", name: "Amandala" },
-    ],
-  },
-  "Roseau": {
-    politico: [
-      { url: "https://dominicanewsonline.com/news/feed/", name: "Dominica News Online" },
-      { url: "https://dominicavibes.dm/feed/", name: "Dominica Vibes" },
-    ],
-    economico: [
-      { url: "https://dominicanewsonline.com/news/feed/", name: "Dominica News Online" },
-    ],
-    cultural: [
-      { url: "https://dominicanewsonline.com/news/feed/", name: "Dominica News Online" },
-    ],
-    relaciones_internacionales: [
-      { url: "https://dominicanewsonline.com/news/feed/", name: "Dominica News Online" },
     ],
   },
   "Saint George's": {
@@ -320,25 +284,40 @@ const LOCATION_FEEDS = {
   },
 };
 
+// ── Country name aliases for keyword matching ────────────────────────────────
+const LOCATION_COUNTRY_TERMS = {
+  "Ciudad de México": ["méxico","mexico","mexicano","mexicana","azteca"],
+  "San Marino":       ["san marino","sanmarinese","sammarinese"],
+  "Timbu":            ["bhutan","bután","bhutanese","butanés"],
+  "Saint John's":     ["antigua","barbuda","antiguan"],
+  "Nasáu":            ["bahamas","bahamian","bahameño"],
+  "Bridgetown":       ["barbados","barbadian","barbadense"],
+  "Belmopán":         ["belize","belice","belizean","beliceño"],
+  "Saint George's":   ["grenada","granada","grenadian","granadino"],
+  "Puerto Príncipe":  ["haiti","haití","haitian","haitiano"],
+  "Basseterre":       ["saint kitts","san cristóbal","nevis","kittitian","nevisian"],
+  "Castries":         ["saint lucia","santa lucía","st. lucia","lucian","luciano"],
+  "Kingstown":        ["saint vincent","san vicente","granadinas","vincentian"],
+  "Paramaribo":       ["suriname","surinam","surinamese","surinamés"],
+};
+
 // ── Category keyword filter (for general feeds that cover all topics) ────────
 const CATEGORY_KEYWORDS = {
-  politico: ["gobierno","política","presidente","congreso","parlamento","ministro","elección","partido","constitución","seguridad","ley","decreto","senado","diputado","gobernador","alcalde"],
-  economico: ["economía","económic","finanza","mercado","inversión","empresa","inflación","pib","crecimiento","comercio","banco","dólar","peso","exportación","importación","deuda","presupuesto"],
-  cultural: ["cultura","arte","festival","exposición","museo","teatro","música","cine","turismo","patrimonio","educación","universidad","literatura","deporte","tradición"],
-  relaciones_internacionales: ["diplomacia","bilateral","cancillería","embajada","tratado","cooperación","oea","caricom","onu","sica","unión europea","relaciones exteriores","acuerdo","reunión","canciller","ministerio de relaciones"],
+  politico: ["gobierno","política","político","presidente","congreso","parlamento","ministro","elección","partido","constitución","seguridad","ley","decreto","senado","diputado","gobernador","alcalde","primer ministro","prime minister","parliament","election","government","political","minister","security"],
+  economico: ["economía","económic","finanza","mercado","inversión","empresa","inflación","pib","crecimiento","comercio","banco","dólar","euro","exportación","importación","deuda","presupuesto","economy","economic","finance","market","investment","inflation","gdp","trade","bank"],
+  cultural: ["cultura","arte","festival","exposición","museo","teatro","música","cine","turismo","patrimonio","educación","universidad","literatura","deporte","tradición","culture","art","museum","festival","tourism","heritage","education","sport","music"],
+  relaciones_internacionales: ["diplomacia","bilateral","cancillería","embajada","tratado","cooperación","oea","caricom","onu","sica","unión europea","relaciones exteriores","acuerdo","canciller","ministerio de relaciones","diplomacy","treaty","cooperation","united nations","foreign","international relations","embassy","minister of foreign"],
 };
 
 // ── Google News locale fallback ──────────────────────────────────────────────
 const GNEWS_LOCALE = {
   "Ciudad de México": { gl: "MX", hl: "es-419" },
-  "Madrid":           { gl: "ES", hl: "es"      },
   "San Marino":       { gl: "IT", hl: "it"      },
   "Timbu":            { gl: "IN", hl: "en"      },
   "Saint John's":     { gl: "AG", hl: "en"      },
   "Nasáu":            { gl: "BS", hl: "en"      },
   "Bridgetown":       { gl: "BB", hl: "en"      },
   "Belmopán":         { gl: "BZ", hl: "es-419"  },
-  "Roseau":           { gl: "DM", hl: "en"      },
   "Saint George's":   { gl: "GD", hl: "en"      },
   "Puerto Príncipe":  { gl: "HT", hl: "fr"      },
   "Basseterre":       { gl: "KN", hl: "en"      },
@@ -348,10 +327,10 @@ const GNEWS_LOCALE = {
 };
 
 const CATEGORY_QUERY = {
-  politico:                   (loc) => `${loc} política gobierno presidente`,
-  economico:                  (loc) => `${loc} economía finanzas mercado`,
-  cultural:                   (loc) => `${loc} cultura arte turismo`,
-  relaciones_internacionales: (loc) => `${loc} diplomacia relaciones internacionales`,
+  politico:                   (loc) => `${loc} política interna gobierno presidente`,
+  economico:                  (loc) => `${loc} economía finanzas mercado comercio`,
+  cultural:                   (loc) => `${loc} cultura arte turismo sociedad`,
+  relaciones_internacionales: (loc) => `${loc} diplomacia relaciones exteriores cancillería`,
 };
 
 // ── Fetch a single RSS feed with timeout ────────────────────────────────────
@@ -394,6 +373,16 @@ async function fetchGoogleNews(location, category) {
 async function fetchCategoryNews(location, category) {
   const locationFeeds = LOCATION_FEEDS[location];
   const feeds = locationFeeds?.[category] ?? [];
+  const categoryKeywords = CATEGORY_KEYWORDS[category] || [];
+  const countryTerms = LOCATION_COUNTRY_TERMS[location] || [];
+
+  // Combined filter: article must match category AND country terms
+  function matchesFilter(item) {
+    const text = `${item.title} ${item.preview}`.toLowerCase();
+    const matchesCategory = categoryKeywords.length === 0 || categoryKeywords.some(k => text.includes(k));
+    const matchesCountry = countryTerms.length === 0 || countryTerms.some(k => text.includes(k));
+    return matchesCategory && matchesCountry;
+  }
 
   let items = [];
 
@@ -402,21 +391,23 @@ async function fetchCategoryNews(location, category) {
     const results = await Promise.all(feeds.map(f => fetchFeed(f, category)));
     const allItems = results.flat();
 
-    // For locations with only general feeds (same feeds across categories), filter by keywords
-    const keywords = CATEGORY_KEYWORDS[category] || [];
-    const hasSpecificFeed = feeds.some(f => f.url.includes(category) || f.url.includes(
-      { politico: 'politi', economico: 'econom', cultural: 'cultur', relaciones_internacionales: 'mundo' }[category] || ''
+    // For category-specific feeds (e.g. jornada.com.mx/rss/politica.xml), only filter by country
+    // For general feeds, filter by both category + country
+    const hasSpecificFeed = feeds.some(f => f.url.includes(
+      { politico: 'politi', economico: 'econom', cultural: 'cultur', relaciones_internacionales: 'mundo' }[category] || '___'
     ));
 
-    if (!hasSpecificFeed && allItems.length > 0) {
-      // Filter by category keywords
+    if (hasSpecificFeed) {
+      // Specific feed: trust the category, only ensure country relevance
       const filtered = allItems.filter(item => {
         const text = `${item.title} ${item.preview}`.toLowerCase();
-        return keywords.some(k => text.includes(k));
+        return countryTerms.length === 0 || countryTerms.some(k => text.includes(k));
       });
-      items = filtered.length >= 3 ? filtered : allItems; // fallback to all if too few matches
+      items = filtered.length >= 3 ? filtered : allItems;
     } else {
-      items = allItems;
+      // General feed: filter by both
+      const filtered = allItems.filter(matchesFilter);
+      items = filtered.length >= 3 ? filtered : allItems;
     }
   }
 
@@ -700,9 +691,9 @@ app.post("/api/media", async (req, res) => {
 
 // ── Cron diario — 7am Lima (UTC-5 = 12:00 UTC) ─────────────────────────────
 const LOCATIONS = [
-  "Ciudad de México", "San Marino", "Timbu", "Madrid",
+  "Ciudad de México", "San Marino", "Timbu",
   "Saint John's", "Nasáu", "Bridgetown", "Belmopán",
-  "Roseau", "Saint George's", "Puerto Príncipe", "Basseterre",
+  "Saint George's", "Puerto Príncipe", "Basseterre",
   "Castries", "Kingstown", "Paramaribo",
 ];
 
