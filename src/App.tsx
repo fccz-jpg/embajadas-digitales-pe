@@ -34,7 +34,7 @@ import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn, getMostFrequentWords } from "./lib/utils";
 import { generateEmbassyReport, generateMediaDatabase, mockNews, mockMediaSources, mockCountryData } from "./services/geminiService";
-import { Report, MediaSource, EMBASSIES } from "./types";
+import { Report, MediaSource, NewsItem, EMBASSIES } from "./types";
 
 function getFavicon(url?: string): string | null {
   if (!url) return null;
@@ -115,6 +115,20 @@ export default function App() {
   const [mediaCountryFilter, setMediaCountryFilter] = useState<string>("all");
   const [isCheckingMedia, setIsCheckingMedia] = useState(false);
   const [isUpdatingMedia, setIsUpdatingMedia] = useState(false);
+  const [liveNews, setLiveNews] = useState<NewsItem[]>([]);
+  const [isLoadingNews, setIsLoadingNews] = useState(false);
+
+  // Fetch live RSS news whenever location or active tab changes
+  useEffect(() => {
+    if (activeView !== "dashboard") return;
+    setIsLoadingNews(true);
+    setLiveNews([]);
+    fetch(`/api/news?location=${encodeURIComponent(location)}&category=${encodeURIComponent(activeTab)}`)
+      .then(r => r.json())
+      .then(data => setLiveNews(Array.isArray(data) ? data : []))
+      .catch(() => setLiveNews([]))
+      .finally(() => setIsLoadingNews(false));
+  }, [location, activeTab, activeView]);
 
   // Load reports from API (fallback to localStorage when offline)
   useEffect(() => {
@@ -538,9 +552,8 @@ export default function App() {
                         Análisis estratégico
                       </h3>
                     </div>
-                    {activeTabReport ? (
-                      <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col">
-                        {/* Analysis Tabs as Fields at the top */}
+                    <div className="bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-lg flex flex-col">
+                        {/* Analysis Tabs */}
                         <div className="flex border-b border-stone-100 overflow-hidden">
                           {/* Político — Navy blue */}
                           <button
@@ -603,273 +616,116 @@ export default function App() {
                           </button>
                         </div>
 
+                        {/* Live RSS news feed — always shown */}
                         <div className={cn(
-                          "flex-1",
-                          activeTab === "politico" && "border-l-4 border-blue-950",
-                          activeTab === "economico" && "border-l-4 border-amber-500",
-                          activeTab === "cultural" && "border-l-4 border-violet-600",
-                          activeTab === "relaciones_internacionales" && "border-l-4 border-teal-600"
+                          "flex-1 border-l-4",
+                          activeTab === "politico" && "border-blue-950",
+                          activeTab === "economico" && "border-amber-500",
+                          activeTab === "cultural" && "border-violet-600",
+                          activeTab === "relaciones_internacionales" && "border-teal-600"
                         )}>
+                          {/* Header */}
                           <div className={cn(
-                            "p-8 border-b",
+                            "px-6 py-4 border-b flex items-center justify-between",
                             activeTab === "politico" && "bg-blue-950 border-blue-900",
                             activeTab === "economico" && "bg-amber-50 border-amber-100",
                             activeTab === "cultural" && "bg-violet-50 border-violet-100",
                             activeTab === "relaciones_internacionales" && "bg-teal-50 border-teal-100"
                           )}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={cn(
-                                "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest",
-                                activeTab === "politico" && "bg-blue-800 text-blue-200",
-                                activeTab === "economico" && "bg-amber-100 text-amber-700",
-                                activeTab === "cultural" && "bg-violet-100 text-violet-700",
-                                activeTab === "relaciones_internacionales" && "bg-teal-100 text-teal-700"
+                            <div>
+                              <h2 className={cn(
+                                "text-lg font-black tracking-tight",
+                                activeTab === "politico" ? "text-white" : "text-stone-900"
                               )}>
-                                {activeTab === "politico" && "Informe político"}
-                                {activeTab === "economico" && "Informe económico"}
-                                {activeTab === "cultural" && "Informe cultural"}
-                                {activeTab === "relaciones_internacionales" && "Informe diplomático"}
-                              </span>
-                              <span className={cn(
-                                "text-[8px] font-bold tracking-widest uppercase",
-                                activeTab === "politico" ? "text-blue-600" : "text-stone-300"
-                              )}>ID: {activeTabReport.id.slice(0, 8)}</span>
-                            </div>
-                            <h1 className={cn(
-                              "text-3xl font-black tracking-tighter mb-1",
-                              activeTab === "politico" ? "text-white" : "text-stone-900"
-                            )}>
-                              {activeTab === "politico" && "Análisis Político y Diplomático"}
-                              {activeTab === "economico" && "Reporte Económico y Comercial"}
-                              {activeTab === "cultural" && "Cooperación Cultural y Técnica"}
-                              {activeTab === "relaciones_internacionales" && "Relaciones Internacionales y Diplomacia"}
-                              <span className={cn(
-                                "font-light ml-2",
-                                activeTab === "politico" ? "text-blue-400" : "text-stone-400"
-                              )}>| {location}</span>
-                            </h1>
-                            <div className={cn(
-                              "flex items-center gap-2 text-[10px] font-bold tracking-widest",
-                              activeTab === "politico" ? "text-blue-300" : "text-mre-blue"
-                            )}>
-                              <ExternalLink size={12} />
-                              {activeTabReport.newsItems?.[0]?.url ? (
-                                <a
-                                  href={activeTabReport.newsItems[0].url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="hover:underline"
-                                >
-                                  Fuente: {activeTabReport.newsItems[0].source}
-                                </a>
-                              ) : (
-                                <span>Fuente: {activeTabReport.newsItems?.[0]?.source || "Monitoreo Global"}</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="p-8">
-
-                          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                            <div className="lg:col-span-3">
-                              <div className="markdown-body prose prose-stone max-w-none">
-                                <ReactMarkdown>
-                                  {getReportText(activeTabReport, activeTab)}
-                                </ReactMarkdown>
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-6">
-                              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
-                                <p className="text-[9px] font-black text-blue-900 tracking-widest mb-3 flex items-center gap-2">
-                                  <TrendingUp size={12} />
-                                  Cifras Clave
-                                </p>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-stone-500 font-bold">Variación</span>
-                                    <span className={cn(
-                                      "text-xs font-black",
-                                      activeTab === "politico" && "text-blue-600",
-                                      activeTab === "economico" && "text-green-600",
-                                      activeTab === "cultural" && "text-purple-600",
-                                      activeTab === "relaciones_internacionales" && "text-teal-600"
-                                    )}>
-                                      {activeTab === "politico" && "+1.2%"}
-                                      {activeTab === "economico" && "+3.5%"}
-                                      {activeTab === "cultural" && "+0.8%"}
-                                      {activeTab === "relaciones_internacionales" && "+2.1%"}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-stone-500 font-bold">Impacto</span>
-                                    <span className="text-xs font-black text-stone-900">
-                                      {activeTab === "politico" && "Alto"}
-                                      {activeTab === "economico" && "Medio"}
-                                      {activeTab === "cultural" && "Bajo"}
-                                      {activeTab === "relaciones_internacionales" && "Alto"}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-stone-500 font-bold">Confianza</span>
-                                    <span className="text-xs font-black text-blue-600">
-                                      {activeTab === "politico" && "95%"}
-                                      {activeTab === "economico" && "92%"}
-                                      {activeTab === "cultural" && "99%"}
-                                      {activeTab === "relaciones_internacionales" && "94%"}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
-                                <p className="text-[9px] font-black text-stone-900 tracking-widest mb-3 flex items-center gap-2">
-                                  <Activity size={12} />
-                                  Dato Relevante
-                                </p>
-                                <p className="text-[11px] text-stone-600 font-medium leading-relaxed">
-                                  {activeTab === "politico" && "Se observa un incremento en las menciones diplomáticas bilaterales en medios oficiales."}
-                                  {activeTab === "economico" && "Nuevas proyecciones sugieren un aumento en el intercambio de productos agroindustriales."}
-                                  {activeTab === "cultural" && "La agenda cultural muestra una alta receptividad hacia las expresiones artísticas peruanas."}
-                                  {activeTab === "relaciones_internacionales" && "Organismos como CARICOM, OEA y SICA son claves para la agenda bilateral con la región."}
-                                </p>
-                              </div>
-
-                              <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
-                                <p className="text-[9px] font-black text-stone-900 tracking-widest mb-3 flex items-center gap-2">
-                                  <Languages size={12} />
-                                  Palabras más frecuentes
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {getMostFrequentWords(
-                                    getReportText(activeTabReport, activeTab)
-                                  ).map(({ word, count }, i) => (
-                                    <div key={i} className="flex items-center gap-1.5 bg-white border border-stone-200 px-2 py-1 rounded-md shadow-sm">
-                                      <span className="text-[10px] font-bold text-stone-700">{word}</span>
-                                      <span className="text-[8px] font-black text-mre-blue bg-blue-50 px-1 rounded">{count}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        </div>
-
-                        {/* 7-day accumulated news for active tab */}
-                        {(() => {
-                          const sevenDaysAgo = new Date();
-                          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                          const seen = new Set<string>();
-                          // Primary: category-specific reports in last 7 days
-                          const catItems = reports
-                            .filter(r => r.location === location && r.category === activeTab && new Date(r.createdAt) >= sevenDaysAgo)
-                            .flatMap(r => (r.newsItems ?? []).map(n => ({ ...n, reportDate: r.createdAt })))
-                            .filter(item => {
-                              const key = item.url || item.title;
-                              if (seen.has(key)) return false;
-                              seen.add(key);
-                              return true;
-                            });
-                          // Fallback: legacy reports (no category), keyword-filtered
-                          const legacyItems = catItems.length === 0
-                            ? reports
-                                .filter(r => r.location === location && !r.category && new Date(r.createdAt) >= sevenDaysAgo)
-                                .flatMap(r => (r.newsItems ?? []).map(n => ({ ...n, reportDate: r.createdAt })))
-                                .filter(item => {
-                                  const key = item.url || item.title;
-                                  if (seen.has(key)) return false;
-                                  seen.add(key);
-                                  return inferCategory(item) === activeTab;
-                                })
-                            : [];
-                          const accumulated = [...catItems, ...legacyItems];
-
-                          if (accumulated.length === 0) return null;
-
-                          const tabColor: Record<string, string> = {
-                            politico: "border-blue-950",
-                            economico: "border-amber-400",
-                            cultural: "border-violet-500",
-                            relaciones_internacionales: "border-teal-500",
-                          };
-                          const tabBadge: Record<string, string> = {
-                            politico: "bg-blue-950 text-white",
-                            economico: "bg-amber-100 text-amber-800",
-                            cultural: "bg-violet-100 text-violet-800",
-                            relaciones_internacionales: "bg-teal-100 text-teal-800",
-                          };
-
-                          return (
-                            <div className="border-t border-stone-100 p-6 bg-stone-50/60">
-                              <p className="text-[9px] font-black text-stone-400 tracking-[0.2em] mb-4 flex items-center gap-2">
-                                <Radio size={12} />
-                                Noticias monitoreadas — últimos 7 días
+                                {activeTab === "politico" && "Monitor Político"}
+                                {activeTab === "economico" && "Monitor Económico"}
+                                {activeTab === "cultural" && "Monitor Cultural"}
+                                {activeTab === "relaciones_internacionales" && "Monitor Diplomático"}
+                                <span className={cn("font-light ml-2 text-sm", activeTab === "politico" ? "text-blue-300" : "text-stone-400")}>
+                                  — {location}
+                                </span>
+                              </h2>
+                              <p className={cn("text-[10px] font-bold tracking-widest mt-0.5", activeTab === "politico" ? "text-blue-400" : "text-stone-400")}>
+                                NOTICIAS EN TIEMPO REAL · ÚLTIMAS 24H
                               </p>
-                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                                {accumulated.map((news, idx) => {
+                            </div>
+                            <div className={cn(
+                              "flex items-center gap-1.5 text-[9px] font-black tracking-widest",
+                              activeTab === "politico" ? "text-blue-300" : "text-stone-400"
+                            )}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                              EN VIVO
+                            </div>
+                          </div>
+
+                          {/* News cards */}
+                          <div className="p-6">
+                            {isLoadingNews ? (
+                              <div className="flex items-center justify-center py-16 gap-3 text-stone-400">
+                                <Loader2 size={18} className="animate-spin" />
+                                <span className="text-sm font-medium">Conectando con medios de comunicación...</span>
+                              </div>
+                            ) : liveNews.length === 0 ? (
+                              <div className="py-12 text-center text-stone-400">
+                                <Radio size={24} className="mx-auto mb-3 opacity-30" />
+                                <p className="text-sm">No se encontraron noticias en este momento.</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {liveNews.map((news, idx) => {
                                   const favicon = getFavicon(news.url);
+                                  const borderColor = {
+                                    politico: "border-l-blue-950",
+                                    economico: "border-l-amber-400",
+                                    cultural: "border-l-violet-500",
+                                    relaciones_internacionales: "border-l-teal-500",
+                                  }[activeTab] ?? "border-l-mre-blue";
                                   return (
-                                    <div key={idx} className={`bg-white border border-stone-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-l-4 ${tabColor[activeTab] ?? "border-mre-blue"}`}>
-                                      <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                          {favicon ? (
-                                            <img src={favicon} alt="" className="w-4 h-4 rounded-sm" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                                          ) : (
-                                            <Globe size={12} className="text-stone-300" />
+                                    <div key={idx} className={`bg-stone-50 border border-stone-100 rounded-xl p-4 hover:bg-white hover:shadow-md transition-all border-l-4 ${borderColor}`}>
+                                      <div className="flex items-start justify-between gap-3 mb-1.5">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {favicon && (
+                                            <img src={favicon} alt="" className="w-4 h-4 rounded-sm shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                                           )}
-                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded tracking-widest ${tabBadge[activeTab] ?? "bg-blue-50 text-blue-800"}`}>
-                                            {news.source}
-                                          </span>
+                                          <span className="text-[9px] font-black text-stone-500 tracking-widest truncate">{news.source}</span>
                                         </div>
-                                        <span className="text-[9px] text-stone-400 font-medium">
-                                          {news.date || format(new Date(news.reportDate), "dd/MM", { locale: es })}
+                                        <span className="text-[9px] text-stone-400 shrink-0">
+                                          {news.date ? format(new Date(news.date), "dd MMM · HH:mm", { locale: es }) : ""}
                                         </span>
                                       </div>
-                                      <h4 className="text-xs font-bold text-stone-900 leading-snug mb-1">
+                                      <h4 className="text-sm font-bold text-stone-900 leading-snug mb-1.5">
                                         {news.url ? (
-                                          <a href={news.url} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-start gap-1">
+                                          <a href={news.url} target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-mre-blue transition-colors flex items-start gap-1">
                                             {news.title}
-                                            <ExternalLink size={10} className="shrink-0 mt-0.5 opacity-40" />
+                                            <ExternalLink size={11} className="shrink-0 mt-0.5 opacity-30" />
                                           </a>
                                         ) : news.title}
                                       </h4>
                                       {news.preview && news.preview !== news.title && (
-                                        <p className="text-[10px] text-stone-500 leading-relaxed line-clamp-2">{news.preview}</p>
+                                        <p className="text-[11px] text-stone-500 leading-relaxed line-clamp-2">{news.preview}</p>
                                       )}
                                     </div>
                                   );
                                 })}
                               </div>
-                            </div>
-                          );
-                        })()}
+                            )}
+                          </div>
 
-                        <div className="px-8 py-4 bg-white border-t border-stone-100 flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-stone-400 tracking-widest">
-                            Generado el {format(new Date(activeTabReport.createdAt), "PPP", { locale: es })}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setSelectedReport(activeTabReport);
-                              setActiveView("reports");
-                            }}
-                            className="text-[10px] font-bold text-mre-blue hover:underline tracking-widest"
-                          >
-                            Ver historial completo
-                          </button>
-                        </div>
+                          {/* AI analysis — shown only if a report has been generated */}
+                          {activeTabReport && (
+                            <div className="border-t border-stone-100 p-6 bg-stone-50/50">
+                              <p className="text-[9px] font-black text-stone-400 tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <Zap size={12} className="text-mre-blue" />
+                                ANÁLISIS IA — {format(new Date(activeTabReport.createdAt), "dd MMM yyyy", { locale: es })}
+                              </p>
+                              <div className="markdown-body prose prose-stone max-w-none text-sm">
+                                <ReactMarkdown>{getReportText(activeTabReport, activeTab)}</ReactMarkdown>
+                              </div>
+                            </div>
+                          )}
+
                       </div>
-                    ) : (
-                      <div className="bg-white border border-dashed border-stone-200 rounded-2xl p-12 text-center shadow-inner">
-                        <p className="text-stone-400 text-sm italic mb-4">No hay análisis reciente para este país.</p>
-                        <button 
-                          onClick={handleUpdateMonitoring}
-                          className="text-xs font-bold text-mre-blue hover:underline tracking-widest"
-                        >
-                          Sincronizar ahora
-                        </button>
-                      </div>
-                    )}
+                    </div>
                   </section>
                 </div>
 

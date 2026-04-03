@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { GoogleGenAI, Type } from "@google/genai";
 import pg from "pg";
 import cron from "node-cron";
+import Parser from "rss-parser";
 
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,7 +42,82 @@ async function initDB() {
   console.log("Base de datos lista.");
 }
 
-initDB().catch(err => console.error("Error inicializando BD:", err.message));
+initDB().catch(err => console.error("Error inicializando BD:", err.message || err));
+
+// ── RSS News ────────────────────────────────────────────────────────────────
+const rssParser = new Parser({
+  timeout: 10000,
+  customFields: { item: [['source', 'source']] },
+  headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MRE-Monitor/1.0)' },
+});
+
+// Google News search queries per category and country name
+const CATEGORY_QUERIES = {
+  politico:                   (loc) => `${loc} política gobierno presidente congreso estabilidad`,
+  economico:                  (loc) => `${loc} economía finanzas inversión comercio PIB inflación`,
+  cultural:                   (loc) => `${loc} cultura arte turismo festival sociedad educación`,
+  relaciones_internacionales: (loc) => `${loc} diplomacia relaciones internacionales cancillería OEA embajada`,
+};
+
+// Per-location Google News locale params (gl, hl)
+const LOCATION_LOCALE = {
+  "Ciudad de México": { gl: "MX", hl: "es-419", lang: "es" },
+  "Madrid":           { gl: "ES", hl: "es",      lang: "es" },
+  "San Marino":       { gl: "IT", hl: "it",      lang: "it" },
+  "Timbu":            { gl: "IN", hl: "en",      lang: "en" },
+  "Saint John's":     { gl: "AG", hl: "en",      lang: "en" },
+  "Nasáu":            { gl: "BS", hl: "en",      lang: "en" },
+  "Bridgetown":       { gl: "BB", hl: "en",      lang: "en" },
+  "Belmopán":         { gl: "BZ", hl: "es-419",  lang: "es" },
+  "Roseau":           { gl: "DM", hl: "en",      lang: "en" },
+  "Saint George's":   { gl: "GD", hl: "en",      lang: "en" },
+  "Puerto Príncipe":  { gl: "HT", hl: "fr",      lang: "fr" },
+  "Basseterre":       { gl: "KN", hl: "en",      lang: "en" },
+  "Castries":         { gl: "LC", hl: "en",      lang: "en" },
+  "Kingstown":        { gl: "VC", hl: "en",      lang: "en" },
+  "Paramaribo":       { gl: "SR", hl: "nl",      lang: "nl" },
+};
+
+function parseGoogleTitle(raw) {
+  // Google News titles: "Article Title - Source Name"
+  const idx = raw.lastIndexOf(' - ');
+  if (idx > 0) return { title: raw.slice(0, idx).trim(), sourceName: raw.slice(idx + 3).trim() };
+  return { title: raw.trim(), sourceName: '' };
+}
+
+async function fetchCategoryNews(location, category) {
+  const queryFn = CATEGORY_QUERIES[category] || CATEGORY_QUERIES.politico;
+  const q = queryFn(location);
+  const locale = LOCATION_LOCALE[location] || { gl: "US", hl: "es-419", lang: "es" };
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${locale.hl}&gl=${locale.gl}&ceid=${locale.gl}:${locale.hl}`;
+
+  const feed = await rssParser.parseURL(url);
+  return feed.items.slice(0, 20).map(item => {
+    const { title, sourceName } = parseGoogleTitle(item.title || '');
+    const source = item.source?._ || sourceName || 'Google News';
+    return {
+      title,
+      source,
+      url: item.link || '',
+      date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+      preview: item.contentSnippet || item.content || title,
+      category,
+    };
+  });
+}
+
+// GET /api/news?location=Ciudad de México&category=politico
+app.get("/api/news", async (req, res) => {
+  const { location, category } = req.query;
+  if (!location || !category) return res.status(400).json({ error: "location y category requeridos" });
+  try {
+    const items = await fetchCategoryNews(location, category);
+    res.json(items);
+  } catch (err) {
+    console.error("Error fetching news:", err.message);
+    res.status(500).json({ error: "Error al obtener noticias: " + err.message });
+  }
+});
 
 // ── Gemini ──────────────────────────────────────────────────────────────────
 function getAI() {
