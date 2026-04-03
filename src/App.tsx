@@ -18,11 +18,8 @@ import {
   Activity,
   AlertTriangle,
   Zap,
-  Info,
-  Users,
   Coins,
   Languages,
-  TrendingUp,
   Eye,
   Menu,
   PanelLeftClose,
@@ -33,7 +30,7 @@ import ReactMarkdown from "react-markdown";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn, getMostFrequentWords } from "./lib/utils";
-import { generateEmbassyReport, generateMediaDatabase, mockNews, mockMediaSources, mockCountryData } from "./services/geminiService";
+import { generateEmbassyReport, generateMediaDatabase } from "./services/geminiService";
 import { Report, MediaSource, NewsItem, EMBASSIES } from "./types";
 
 function getFavicon(url?: string): string | null {
@@ -111,7 +108,8 @@ export default function App() {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mediaSources, setMediaSources] = useState<MediaSource[]>(mockMediaSources);
+  const [mediaSources, setMediaSources] = useState<MediaSource[]>([]);
+  const [allCategoryNews, setAllCategoryNews] = useState<NewsItem[]>([]);
   const [mediaCountryFilter, setMediaCountryFilter] = useState<string>("all");
   const [isCheckingMedia, setIsCheckingMedia] = useState(false);
   const [isUpdatingMedia, setIsUpdatingMedia] = useState(false);
@@ -129,6 +127,19 @@ export default function App() {
       .catch(() => setLiveNews([]))
       .finally(() => setIsLoadingNews(false));
   }, [location, activeTab, activeView]);
+
+  // Fetch all 4 categories in parallel for dashboard metrics
+  useEffect(() => {
+    if (activeView !== "dashboard") return;
+    setAllCategoryNews([]);
+    const cats = ["politico", "economico", "cultural", "relaciones_internacionales"];
+    Promise.all(cats.map(cat =>
+      fetch(`/api/news?location=${encodeURIComponent(location)}&category=${encodeURIComponent(cat)}`)
+        .then(r => r.json())
+        .then(data => Array.isArray(data) ? data.map((item: NewsItem) => ({ ...item, category: cat as NewsItem["category"] })) : [])
+        .catch(() => [])
+    )).then(results => setAllCategoryNews((results as NewsItem[][]).flat()));
+  }, [location, activeView]);
 
   // Load reports from API (fallback to localStorage when offline)
   useEffect(() => {
@@ -247,6 +258,28 @@ export default function App() {
   const activeTabReport =
     reports.find(r => r.location === location && r.category === activeTab)
     ?? reports.find(r => r.location === location && !r.category);
+
+  // ── Dashboard metrics derived from real RSS news ─────────────────────────
+  const CRISIS_KW = ["crisis","conflicto","violencia","protesta","huelga","emergencia","ataque","colapso","caos","desastre","disturbio","golpe"];
+  const NEG_ECON_KW = ["recesión","desempleo","quiebra","déficit","contracción","caída","pérdida","escasez","devaluación","embargo"];
+  const uniqueSources = new Set(allCategoryNews.map(n => n.source)).size;
+  const criticalAlerts = allCategoryNews.filter(n => {
+    const text = `${n.title} ${n.preview ?? ""}`.toLowerCase();
+    return CRISIS_KW.some(k => text.includes(k));
+  }).length;
+  const riskLevel = criticalAlerts === 0 ? "Bajo" : criticalAlerts <= 3 ? "Medio" : "Alto";
+  const riskColor = criticalAlerts === 0 ? "text-green-600" : criticalAlerts <= 3 ? "text-amber-500" : "text-red-600";
+  const riskIconColor = criticalAlerts === 0 ? "text-green-500" : criticalAlerts <= 3 ? "text-amber-400" : "text-red-500";
+  const politicalNews = allCategoryNews.filter(n => n.category === "politico");
+  const economicNews = allCategoryNews.filter(n => n.category === "economico");
+  const polCrisis = politicalNews.filter(n => CRISIS_KW.some(k => `${n.title} ${n.preview ?? ""}`.toLowerCase().includes(k))).length;
+  const econNeg = economicNews.filter(n => [...CRISIS_KW, ...NEG_ECON_KW].some(k => `${n.title} ${n.preview ?? ""}`.toLowerCase().includes(k))).length;
+  const polStability = politicalNews.length > 0 ? Math.round((1 - polCrisis / politicalNews.length) * 100) : null;
+  const econStability = economicNews.length > 0 ? Math.round((1 - econNeg / economicNews.length) * 100) : null;
+  const polColor = polStability !== null && polStability >= 70 ? "text-green-600" : polStability !== null && polStability >= 40 ? "text-amber-600" : "text-red-600";
+  const polBarColor = polStability !== null && polStability >= 70 ? "bg-green-500" : polStability !== null && polStability >= 40 ? "bg-amber-500" : "bg-red-500";
+  const econColor = econStability !== null && econStability >= 70 ? "text-green-600" : econStability !== null && econStability >= 40 ? "text-amber-600" : "text-red-600";
+  const econBarColor = econStability !== null && econStability >= 70 ? "bg-green-500" : econStability !== null && econStability >= 40 ? "bg-amber-500" : "bg-red-500";
 
   const viewNames: Record<View, string> = {
     home: "Inicio",
@@ -484,7 +517,7 @@ export default function App() {
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-2">Fuentes activas</p>
                     <div className="flex items-end justify-between">
                       <span className="text-2xl font-bold text-stone-900 tracking-tighter">
-                        {mockMediaSources.filter(s => s.location === location).length}
+                        {uniqueSources > 0 ? uniqueSources : "—"}
                       </span>
                       <Radio className="text-mre-blue" size={18} />
                     </div>
@@ -492,15 +525,19 @@ export default function App() {
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-2">Alertas críticas</p>
                     <div className="flex items-end justify-between">
-                      <span className="text-2xl font-bold text-stone-900 tracking-tighter">0</span>
+                      <span className="text-2xl font-bold text-stone-900 tracking-tighter">
+                        {allCategoryNews.length > 0 ? criticalAlerts : "—"}
+                      </span>
                       <AlertTriangle className="text-amber-500" size={18} />
                     </div>
                   </div>
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-2">Nivel de riesgo</p>
                     <div className="flex items-end justify-between">
-                      <span className="text-2xl font-bold text-green-600 tracking-tighter">Bajo</span>
-                      <Activity className="text-green-500" size={18} />
+                      <span className={`text-2xl font-bold tracking-tighter ${allCategoryNews.length > 0 ? riskColor : "text-stone-400"}`}>
+                        {allCategoryNews.length > 0 ? riskLevel : "—"}
+                      </span>
+                      <Activity className={allCategoryNews.length > 0 ? riskIconColor : "text-stone-300"} size={18} />
                     </div>
                   </div>
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
@@ -519,26 +556,34 @@ export default function App() {
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest">Indicadores de estabilidad</p>
                     <Activity size={14} className="text-stone-300" />
                   </div>
+                  {polStability === null && econStability === null ? (
+                    <p className="text-[10px] text-stone-400 italic text-center py-4">Cargando datos...</p>
+                  ) : (
                   <div className="space-y-3">
+                    {polStability !== null && (
                     <div className="space-y-1">
                       <div className="flex justify-between text-[8px] font-bold tracking-wider">
                         <span className="text-stone-500">Política</span>
-                        <span className="text-green-600">85%</span>
+                        <span className={polColor}>{polStability}%</span>
                       </div>
                       <div className="w-full bg-stone-100 h-1 rounded-full overflow-hidden">
-                        <div className="bg-green-500 h-full w-[85%]"></div>
+                        <div className={`${polBarColor} h-full transition-all`} style={{ width: `${polStability}%` }}></div>
                       </div>
                     </div>
+                    )}
+                    {econStability !== null && (
                     <div className="space-y-1">
                       <div className="flex justify-between text-[8px] font-bold tracking-wider">
                         <span className="text-stone-500">Economía</span>
-                        <span className="text-amber-600">62%</span>
+                        <span className={econColor}>{econStability}%</span>
                       </div>
                       <div className="w-full bg-stone-100 h-1 rounded-full overflow-hidden">
-                        <div className="bg-amber-500 h-full w-[62%]"></div>
+                        <div className={`${econBarColor} h-full transition-all`} style={{ width: `${econStability}%` }}></div>
                       </div>
                     </div>
+                    )}
                   </div>
+                  )}
                 </div>
               </div>
 
@@ -733,57 +778,29 @@ export default function App() {
                   {/* Country Data Card */}
                   <section className="space-y-4">
                     <h3 className="text-[11px] font-bold text-stone-400 tracking-[0.2em] flex items-center gap-2">
-                      <Info size={14} />
-                      Ficha de datos del país
+                      <Activity size={14} />
+                      Cobertura por categoría
                     </h3>
-                    <div className="bg-white border border-stone-100 rounded-2xl p-6 shadow-lg space-y-6">
-                      <div className="flex items-center gap-4 pb-4 border-b border-stone-50">
-                        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
-                          <Globe size={24} />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-stone-900">{location}</h4>
-                          <p className="text-[10px] text-stone-400 font-bold tracking-widest">Información general</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="flex items-start gap-3">
-                          <MapPin size={16} className="text-stone-300 mt-0.5" />
-                          <div>
-                            <p className="text-[10px] text-stone-400 font-bold tracking-widest">Capital</p>
-                            <p className="text-sm font-semibold text-stone-700">{mockCountryData[location]?.capital}</p>
+                    <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-lg space-y-3">
+                      {(["politico","economico","cultural","relaciones_internacionales"] as const).map(cat => {
+                        const count = allCategoryNews.filter(n => n.category === cat).length;
+                        const label = { politico: "Política", economico: "Economía", cultural: "Cultura", relaciones_internacionales: "RR. Int." }[cat];
+                        const max = 25;
+                        const pct = Math.round((count / max) * 100);
+                        const barColor = { politico: "bg-blue-900", economico: "bg-amber-500", cultural: "bg-violet-600", relaciones_internacionales: "bg-teal-600" }[cat];
+                        const textColor = { politico: "text-blue-900", economico: "text-amber-600", cultural: "text-violet-600", relaciones_internacionales: "text-teal-600" }[cat];
+                        return (
+                          <div key={cat} className="space-y-1">
+                            <div className="flex justify-between text-[8px] font-bold tracking-wider">
+                              <span className="text-stone-500">{label}</span>
+                              <span className={textColor}>{count} noticias</span>
+                            </div>
+                            <div className="w-full bg-stone-100 h-1 rounded-full overflow-hidden">
+                              <div className={`${barColor} h-full transition-all`} style={{ width: `${pct}%` }}></div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Users size={16} className="text-stone-300 mt-0.5" />
-                          <div>
-                            <p className="text-[10px] text-stone-400 font-bold tracking-widest">Población</p>
-                            <p className="text-sm font-semibold text-stone-700">{mockCountryData[location]?.population}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Coins size={16} className="text-stone-300 mt-0.5" />
-                          <div>
-                            <p className="text-[10px] text-stone-400 font-bold tracking-widest">Moneda</p>
-                            <p className="text-sm font-semibold text-stone-700">{mockCountryData[location]?.currency}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Languages size={16} className="text-stone-300 mt-0.5" />
-                          <div>
-                            <p className="text-[10px] text-stone-400 font-bold tracking-widest">Idioma</p>
-                            <p className="text-sm font-semibold text-stone-700">{mockCountryData[location]?.language}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <TrendingUp size={16} className="text-stone-300 mt-0.5" />
-                          <div>
-                            <p className="text-[10px] text-stone-400 font-bold tracking-widest">PIB nominal</p>
-                            <p className="text-sm font-semibold text-stone-700">{mockCountryData[location]?.gdp}</p>
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
                   </section>
 
@@ -1146,10 +1163,15 @@ export default function App() {
                           if (selectedCountries.length === 0) return;
                           setIsAnalyzing(true);
                           try {
-                            // For now, we analyze the first selected country or a combination
                             const targetLocation = selectedCountries.join(" & ");
-                            const allNewsItems = selectedCountries.flatMap(c => mockNews[c as keyof typeof mockNews] || []);
-                            const newsString = allNewsItems.map(n => `- ${n.source}: ${n.title}`).join("\n");
+                            const fetched = await Promise.all(
+                              selectedCountries.map(c =>
+                                fetch(`/api/news?location=${encodeURIComponent(c)}&category=politico`)
+                                  .then(r => r.json()).then(d => Array.isArray(d) ? d : []).catch(() => [])
+                              )
+                            );
+                            const allNewsItems = fetched.flat();
+                            const newsString = allNewsItems.map((n: NewsItem) => `- ${n.source}: ${n.title}`).join("\n");
                             
                             const newReports = await generateEmbassyReport(targetLocation, newsString);
                             const updatedReports = [...newReports, ...reports];
