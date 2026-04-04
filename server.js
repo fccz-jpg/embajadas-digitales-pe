@@ -484,31 +484,39 @@ const CATEGORIES = {
 async function generateCategoryReport(location, category) {
   const { label, focus } = CATEGORIES[category];
 
+  const today = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+
   const prompt = `Actúa como analista de inteligencia estratégica del Ministerio de Relaciones Exteriores (MRE) de Perú.
 
-Genera un informe ${label} completo y detallado sobre ${location}.
+Genera el REPORTE DIARIO ${label.toUpperCase()} sobre ${location} correspondiente al ${today}.
 
 ENFOQUE EXCLUSIVO: ${focus}
 
-INSTRUCCIONES:
-1. Busca y analiza las noticias más recientes (últimas 24-48 horas) sobre este tema en ${location}.
-2. Redacta un análisis estructurado que incluya:
-   - Contexto y situación actual
-   - Hechos y eventos relevantes del período monitoreado
-   - Actores clave y sus posiciones
-   - Tendencias identificadas
-   - Perspectivas a corto plazo
-3. Extensión mínima: 400 palabras de análisis.
+ESTRUCTURA OBLIGATORIA — usa exactamente estos títulos numerados en mayúsculas, en texto plano (sin Markdown especial):
 
-FORMATO:
-- Usa Markdown. Comienza con un título ## descriptivo.
-- Usa **negritas** para resaltar datos clave, cifras, fechas y nombres de medios.
-- Usa listas con viñetas para enumerar hechos concretos.
-- Tono profesional, analítico y de alta dirección.
-- NO compares con Perú ni hagas referencias a relaciones bilaterales con Perú. Enfócate exclusivamente en ${location}.
-- Si no hay noticias relevantes en el período: indica "Sin reportes relevantes en los medios monitoreados durante el presente período."
+REPORTE DIARIO: ${label.toUpperCase()} — ${today}
 
-Para cada fuente utilizada: proporciona el título exacto del artículo, nombre del medio, URL activa, fecha de publicación y una descripción breve de 1-2 oraciones del contenido.`;
+1. SITUACIÓN DEL DÍA
+Resumen ejecutivo de los hechos más relevantes de las últimas 24-48 horas. Mínimo 150 palabras. Incluye cifras, declaraciones textuales y nombres de fuentes entre paréntesis.
+
+2. DESARROLLO DÍA A DÍA
+Cronología de eventos del período, organizados por fecha (del más antiguo al más reciente). Para cada día: subtítulo con la fecha exacta (ej. "2.1. Jueves, 03 de abril de 2026") seguido de párrafo narrativo detallado. Cita fuentes al final de cada párrafo: (Fuentes: Medio A, Medio B, año).
+
+3. ACTORES Y ACCIONES RECIENTES
+Subsecciones por actor principal (gobierno, oposición, organismos internacionales, etc.). Para cada uno: subtítulo con nombre del actor (ej. "3.1. Nombre del actor") seguido de descripción en prosa de sus acciones, declaraciones y posiciones en el período.
+
+4. CONTEXTO NECESARIO
+Antecedentes estructurales necesarios para interpretar los eventos del día. Incluye datos históricos, marcos institucionales y tendencias de largo plazo relevantes. Texto continuo en prosa.
+
+REGLAS ESTRICTAS:
+- Texto continuo en prosa, NO listas con viñetas ni asteriscos.
+- Cita fuentes entre paréntesis dentro del texto.
+- Mínimo 600 palabras en total.
+- Tono profesional, analítico, de inteligencia estratégica.
+- NO menciones a Perú ni relaciones bilaterales con Perú.
+- Si no hay eventos relevantes en el período: escribe "Sin reportes relevantes en los medios monitoreados durante el presente período."
+
+Para el campo sources: lista cada artículo consultado con título exacto, nombre del medio, URL activa y fecha.`;
 
   const ai = getAI();
   const response = await ai.models.generateContent({
