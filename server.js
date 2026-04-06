@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { GoogleGenAI, Type } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import pg from "pg";
 import cron from "node-cron";
 import Parser from "rss-parser";
@@ -449,11 +449,11 @@ app.get("/api/news", async (req, res) => {
   }
 });
 
-// ── Gemini ──────────────────────────────────────────────────────────────────
+// ── Claude (Anthropic) ───────────────────────────────────────────────────────
 function getAI() {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY no configurado");
-  return new GoogleGenAI({ apiKey: key });
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error("ANTHROPIC_API_KEY no configurado");
+  return new Anthropic({ apiKey: key });
 }
 
 // ── Category configs ────────────────────────────────────────────────────────
@@ -485,92 +485,92 @@ const CATEGORIES = {
   },
 };
 
-// ── Generate one category report ────────────────────────────────────────────
+// ── Generate one category report using Claude + real RSS news ────────────────
 async function generateCategoryReport(location, category) {
   const { label, focus } = CATEGORIES[category];
 
+  // 1. Fetch real RSS news to ground the analysis
+  const cats = category === 'panorama_general'
+    ? ['politico', 'economico', 'cultural', 'relaciones_internacionales']
+    : [category];
+  const allNews = (await Promise.all(cats.map(c => fetchCategoryNews(location, c)))).flat();
+
+  const newsContext = allNews.length > 0
+    ? allNews.map(n =>
+        `• [${n.source}] ${n.title}${n.preview && n.preview !== n.title ? ' — ' + n.preview.slice(0, 200) : ''} (${n.date ? new Date(n.date).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'reciente'})`
+      ).join('\n')
+    : 'No se encontraron artículos en los RSS monitoreados en este período.';
+
   const today = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
 
-  const prompt = `Actúa como analista de inteligencia estratégica del Ministerio de Relaciones Exteriores (MRE) de Perú.
+  const systemPrompt = `Eres un analista de inteligencia estratégica del Ministerio de Relaciones Exteriores (MRE) del Perú. Generas reportes diarios de inteligencia basados EXCLUSIVAMENTE en las noticias reales proporcionadas. No inventas eventos ni fuentes. Si las noticias no cubren algún aspecto, lo indicas explícitamente.`;
 
-Genera el REPORTE DIARIO ${label.toUpperCase()} sobre ${location} correspondiente al ${today}.
+  const userPrompt = `Genera el REPORTE DIARIO ${label.toUpperCase()} sobre ${location} — ${today}.
 
-ENFOQUE EXCLUSIVO: ${focus}
+NOTICIAS REALES DISPONIBLES (fuente: RSS de medios locales):
+${newsContext}
 
-ESTRUCTURA OBLIGATORIA — usa exactamente estos títulos numerados en mayúsculas, en texto plano (sin Markdown especial):
+ENFOQUE: ${focus}
+
+ESTRUCTURA OBLIGATORIA (usa exactamente estos títulos en mayúsculas):
 
 REPORTE DIARIO: ${label.toUpperCase()} — ${today}
 
 1. SITUACIÓN DEL DÍA
-Resumen ejecutivo de los hechos más relevantes de las últimas 24-48 horas. Mínimo 150 palabras. Incluye cifras, declaraciones textuales y nombres de fuentes entre paréntesis.
+Resumen ejecutivo de los hechos más relevantes basado en las noticias proporcionadas. Mínimo 150 palabras. Cita el medio entre paréntesis al mencionar cada hecho.
 
 2. DESARROLLO DÍA A DÍA
-Cronología de eventos del período, organizados por fecha (del más antiguo al más reciente). Para cada día: subtítulo con la fecha exacta (ej. "2.1. Jueves, 03 de abril de 2026") seguido de párrafo narrativo detallado. Cita fuentes al final de cada párrafo: (Fuentes: Medio A, Medio B, año).
+Cronología de eventos organizados por fecha (del más antiguo al más reciente). Para cada grupo de noticias del mismo día: subtítulo con la fecha (ej. "2.1. Lunes, 06 de abril de 2026") seguido de párrafo narrativo. Cita fuentes: (Fuente: Nombre del medio).
 
 3. ACTORES Y ACCIONES RECIENTES
-Subsecciones por actor principal (gobierno, oposición, organismos internacionales, etc.). Para cada uno: subtítulo con nombre del actor (ej. "3.1. Nombre del actor") seguido de descripción en prosa de sus acciones, declaraciones y posiciones en el período.
+Subsecciones por actor principal identificado en las noticias (ej. "3.1. Gobierno", "3.2. Oposición"). Descripción en prosa de sus acciones y declaraciones.
 
 4. CONTEXTO NECESARIO
-Antecedentes estructurales necesarios para interpretar los eventos del día. Incluye datos históricos, marcos institucionales y tendencias de largo plazo relevantes. Texto continuo en prosa.
+Antecedentes para interpretar los eventos: marco institucional, historia reciente relevante, tendencias estructurales. Texto continuo en prosa.
 ${category === 'panorama_general' ? `
 5. POSICIÓN OFICIAL DEL PERÚ
-Busca y cita declaraciones oficiales, comunicados de prensa, notas diplomáticas o posiciones públicas del gobierno del Perú, la Cancillería peruana o el Ministerio de Relaciones Exteriores del Perú respecto a ${location} o a los eventos del período monitoreado. Cita fuentes entre paréntesis. Si no hay registro: "Sin declaración oficial del Perú registrada en el período monitoreado."` : ''}
+Basándote en tu conocimiento, indica si el gobierno del Perú, la Cancillería o el MRE han emitido declaraciones públicas sobre ${location} o los eventos del período. Cita fuentes si las conoces. Si no hay registro: "Sin declaración oficial del Perú registrada en el período monitoreado."` : ''}
 
-REGLAS ESTRICTAS:
-- Texto continuo en prosa, NO listas con viñetas ni asteriscos.
-- Cita fuentes entre paréntesis dentro del texto.
-- Mínimo 600 palabras en total.
-- Tono profesional, analítico, de inteligencia estratégica.
-${category === 'panorama_general' ? `- INCLUYE la sección 5 sobre Perú. Busca declaraciones, comunicados o posiciones oficiales del gobierno peruano, Cancillería o MRE respecto a ${location} o los eventos del período. Si no hay declaración oficial registrada, escribe: "Sin declaración oficial del Perú registrada en el período monitoreado."` : `- NO menciones a Perú ni relaciones bilaterales con Perú.`}
-- Si no hay eventos relevantes en el período: escribe "Sin reportes relevantes en los medios monitoreados durante el presente período."
+REGLAS:
+- Texto en prosa continua, SIN listas con viñetas ni asteriscos.
+- Cita el medio entre paréntesis al mencionar cada dato.
+- Mínimo 600 palabras.
+- Tono profesional y analítico.
+${category !== 'panorama_general' ? '- No hagas referencias a Perú ni relaciones bilaterales con Perú.' : ''}
+- Si las noticias son insuficientes para alguna sección, indícalo honestamente.`;
 
-Para el campo sources: lista cada artículo consultado con título exacto, nombre del medio, URL activa y fecha.`;
-
+  // 2. Call Claude with streaming (reports can be long)
   const ai = getAI();
-  const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
-    contents: prompt,
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          text: { type: Type.STRING },
-          sources: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                title:   { type: Type.STRING },
-                source:  { type: Type.STRING },
-                url:     { type: Type.STRING },
-                date:    { type: Type.STRING },
-                preview: { type: Type.STRING },
-              },
-            },
-          },
-        },
-        required: ["text", "sources"],
-      },
-    },
+  const stream = ai.messages.stream({
+    model: 'claude-opus-4-6',
+    max_tokens: 4096,
+    thinking: { type: 'adaptive' },
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
   });
 
-  const content = JSON.parse(response.text);
-  const newsItems = (content.sources ?? []).map(s => ({
-    title:    s.title,
-    source:   s.source,
-    preview:  s.preview || s.title,
-    date:     s.date,
-    url:      s.url,
-    category,
+  const response = await stream.finalMessage();
+  const text = response.content
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('');
+
+  // 3. Use the fetched RSS news as sources
+  const sources = allNews.map(n => ({
+    title:   n.title,
+    source:  n.source,
+    url:     n.url,
+    date:    n.date,
+    preview: n.preview,
   }));
+
+  const newsItems = allNews.map(n => ({ ...n, category }));
 
   const { rows } = await pool.query(
     `INSERT INTO reports (location, category, content, raw_news, news_items)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id, location, category, content, news_items, created_at`,
-    [location, category, JSON.stringify({ text: content.text, sources: content.sources }), "Real-time via Google Grounding", JSON.stringify(newsItems)]
+    [location, category, JSON.stringify({ text, sources }), `RSS + Claude claude-opus-4-6`, JSON.stringify(newsItems)]
   );
 
   const r = rows[0];
@@ -658,37 +658,38 @@ app.post("/api/media", async (req, res) => {
   const { location } = req.body;
   if (!location) return res.status(400).json({ error: "location requerido" });
 
-  const prompt = `
-    Eres un experto en monitoreo de medios internacionales para el MRE de Perú.
-    Genera una lista de los principales medios de comunicación de ${location} relevantes para política, economía, relaciones internacionales y cultura.
-    Para cada medio: name (nombre), type ("Diario", "Radio", "TV" o "Digital"), url (URL oficial activa).
-  `;
-
   try {
     const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              type: { type: Type.STRING },
-              url:  { type: Type.STRING },
-            },
-            required: ["name", "type", "url"],
-          },
+    const stream = ai.messages.stream({
+      model: "claude-opus-4-6",
+      max_tokens: 2048,
+      thinking: { type: "adaptive" },
+      system:
+        "Eres un experto en monitoreo de medios internacionales para el MRE de Perú. " +
+        "Responde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdown, sin bloques de código.",
+      messages: [
+        {
+          role: "user",
+          content:
+            `Genera una lista de los 10 principales medios de comunicación de ${location} ` +
+            `relevantes para política, economía, relaciones internacionales y cultura. ` +
+            `Para cada medio incluye: name (nombre del medio), type (uno de: "Diario", "Radio", "TV", "Digital"), ` +
+            `url (URL oficial activa). ` +
+            `Responde SOLO con el array JSON, ejemplo: [{"name":"El Comercio","type":"Diario","url":"https://elcomercio.pe"}]`,
         },
-      },
+      ],
     });
+    const response = await stream.finalMessage();
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (!textBlock) throw new Error("No text block in Claude response");
+
+    // Extract JSON array from the response text (strip any accidental markdown)
+    const raw = textBlock.text.replace(/```(?:json)?/gi, "").trim();
+    const parsed = JSON.parse(raw);
 
     const validTypes = ["Diario", "Radio", "TV", "Digital"];
-    const sources = JSON.parse(response.text).map((s, i) => ({
+    const sources = parsed.map((s, i) => ({
       id:        `gen_${Date.now()}_${i}`,
       name:      s.name,
       country:   location,
