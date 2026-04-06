@@ -478,6 +478,11 @@ const CATEGORIES = {
     focus: "relaciones diplomáticas, acuerdos bilaterales y multilaterales, organismos internacionales (OEA, CARICOM, ONU, SICA, etc.) y agenda exterior",
     searchTerms: "diplomacia relaciones internacionales organismos multilaterales",
   },
+  panorama_general: {
+    label: "Panorama General",
+    focus: "síntesis integral de la situación política, económica, cultural y diplomática del país, más la posición oficial de Perú respecto a los eventos del período",
+    searchTerms: "situación actual política economía diplomacia",
+  },
 };
 
 // ── Generate one category report ────────────────────────────────────────────
@@ -507,13 +512,16 @@ Subsecciones por actor principal (gobierno, oposición, organismos internacional
 
 4. CONTEXTO NECESARIO
 Antecedentes estructurales necesarios para interpretar los eventos del día. Incluye datos históricos, marcos institucionales y tendencias de largo plazo relevantes. Texto continuo en prosa.
+${category === 'panorama_general' ? `
+5. POSICIÓN OFICIAL DEL PERÚ
+Busca y cita declaraciones oficiales, comunicados de prensa, notas diplomáticas o posiciones públicas del gobierno del Perú, la Cancillería peruana o el Ministerio de Relaciones Exteriores del Perú respecto a ${location} o a los eventos del período monitoreado. Cita fuentes entre paréntesis. Si no hay registro: "Sin declaración oficial del Perú registrada en el período monitoreado."` : ''}
 
 REGLAS ESTRICTAS:
 - Texto continuo en prosa, NO listas con viñetas ni asteriscos.
 - Cita fuentes entre paréntesis dentro del texto.
 - Mínimo 600 palabras en total.
 - Tono profesional, analítico, de inteligencia estratégica.
-- NO menciones a Perú ni relaciones bilaterales con Perú.
+${category === 'panorama_general' ? `- INCLUYE la sección 5 sobre Perú. Busca declaraciones, comunicados o posiciones oficiales del gobierno peruano, Cancillería o MRE respecto a ${location} o los eventos del período. Si no hay declaración oficial registrada, escribe: "Sin declaración oficial del Perú registrada en el período monitoreado."` : `- NO menciones a Perú ni relaciones bilaterales con Perú.`}
 - Si no hay eventos relevantes en el período: escribe "Sin reportes relevantes en los medios monitoreados durante el presente período."
 
 Para el campo sources: lista cada artículo consultado con título exacto, nombre del medio, URL activa y fecha.`;
@@ -708,7 +716,7 @@ const LOCATIONS = [
 cron.schedule("0 12 * * *", async () => {
   console.log(`[${new Date().toISOString()}] Iniciando generación diaria...`);
   for (const loc of LOCATIONS) {
-    for (const cat of ["politico", "economico", "cultural", "relaciones_internacionales"]) {
+    for (const cat of ["politico", "economico", "cultural", "relaciones_internacionales", "panorama_general"]) {
       try {
         await generateCategoryReport(loc, cat);
         console.log(`  ✓ ${loc} / ${cat}`);

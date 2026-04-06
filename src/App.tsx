@@ -119,6 +119,7 @@ export default function App() {
   // Fetch live RSS news whenever location or active tab changes
   useEffect(() => {
     if (activeView !== "dashboard") return;
+    if (activeTab === "panorama_general") return;
     setIsLoadingNews(true);
     setLiveNews([]);
     fetch(`/api/news?location=${encodeURIComponent(location)}&category=${encodeURIComponent(activeTab)}`)
@@ -649,7 +650,7 @@ export default function App() {
                           <button
                             onClick={() => setActiveTab("relaciones_internacionales")}
                             className={cn(
-                              "flex-1 py-4 px-2 text-[9px] font-black tracking-widest transition-all flex flex-col items-center gap-1.5",
+                              "flex-1 py-4 px-2 text-[9px] font-black tracking-widest transition-all flex flex-col items-center gap-1.5 border-r border-stone-100",
                               activeTab === "relaciones_internacionales"
                                 ? "bg-teal-600 text-white"
                                 : "text-stone-400 hover:bg-teal-50 hover:text-teal-700"
@@ -659,15 +660,31 @@ export default function App() {
                             <span className="text-center leading-tight">RR. Int.</span>
                             {activeTab === "relaciones_internacionales" && <span className="w-4 h-0.5 bg-teal-300 rounded-full" />}
                           </button>
+
+                          {/* Panorama General — Dark red */}
+                          <button
+                            onClick={() => setActiveTab("panorama_general")}
+                            className={cn(
+                              "flex-1 py-4 px-2 text-[9px] font-black tracking-widest transition-all flex flex-col items-center gap-1.5",
+                              activeTab === "panorama_general"
+                                ? "bg-red-800 text-white"
+                                : "text-stone-400 hover:bg-red-50 hover:text-red-800"
+                            )}
+                          >
+                            <FileText size={15} className={activeTab === "panorama_general" ? "text-red-200" : ""} />
+                            <span className="text-center leading-tight">Informe</span>
+                            {activeTab === "panorama_general" && <span className="w-4 h-0.5 bg-red-300 rounded-full" />}
+                          </button>
                         </div>
 
-                        {/* Live RSS news feed — always shown */}
+                        {/* Content area */}
                         <div className={cn(
                           "flex-1 border-l-4",
                           activeTab === "politico" && "border-blue-950",
                           activeTab === "economico" && "border-amber-500",
                           activeTab === "cultural" && "border-violet-600",
-                          activeTab === "relaciones_internacionales" && "border-teal-600"
+                          activeTab === "relaciones_internacionales" && "border-teal-600",
+                          activeTab === "panorama_general" && "border-red-800"
                         )}>
                           {/* Header */}
                           <div className={cn(
@@ -675,31 +692,39 @@ export default function App() {
                             activeTab === "politico" && "bg-blue-950 border-blue-900",
                             activeTab === "economico" && "bg-amber-50 border-amber-100",
                             activeTab === "cultural" && "bg-violet-50 border-violet-100",
-                            activeTab === "relaciones_internacionales" && "bg-teal-50 border-teal-100"
+                            activeTab === "relaciones_internacionales" && "bg-teal-50 border-teal-100",
+                            activeTab === "panorama_general" && "bg-red-900 border-red-800"
                           )}>
                             <div>
                               <h2 className={cn(
                                 "text-lg font-black tracking-tight",
-                                activeTab === "politico" ? "text-white" : "text-stone-900"
+                                activeTab === "politico" || activeTab === "panorama_general" ? "text-white" : "text-stone-900"
                               )}>
                                 {activeTab === "politico" && "Monitor Político"}
                                 {activeTab === "economico" && "Monitor Económico"}
                                 {activeTab === "cultural" && "Monitor Cultural"}
                                 {activeTab === "relaciones_internacionales" && "Monitor Diplomático"}
-                                <span className={cn("font-light ml-2 text-sm", activeTab === "politico" ? "text-blue-300" : "text-stone-400")}>
+                                {activeTab === "panorama_general" && "Informe Diario"}
+                                <span className={cn("font-light ml-2 text-sm", activeTab === "politico" ? "text-blue-300" : activeTab === "panorama_general" ? "text-red-200" : "text-stone-400")}>
                                   — {location}
                                 </span>
                               </h2>
-                              <p className={cn("text-[10px] font-bold tracking-widest mt-0.5", activeTab === "politico" ? "text-blue-400" : "text-stone-400")}>
-                                NOTICIAS EN TIEMPO REAL · ÚLTIMAS 24H
+                              <p className={cn("text-[10px] font-bold tracking-widest mt-0.5",
+                                activeTab === "politico" ? "text-blue-400" :
+                                activeTab === "panorama_general" ? "text-red-300" : "text-stone-400"
+                              )}>
+                                {activeTab === "panorama_general" ? "SÍNTESIS ESTRATÉGICA DIARIA · IA" : "NOTICIAS EN TIEMPO REAL · ÚLTIMAS 24H"}
                               </p>
                             </div>
                             <div className={cn(
                               "flex items-center gap-1.5 text-[9px] font-black tracking-widest",
-                              activeTab === "politico" ? "text-blue-300" : "text-stone-400"
+                              activeTab === "politico" ? "text-blue-300" : activeTab === "panorama_general" ? "text-red-300" : "text-stone-400"
                             )}>
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                              EN VIVO
+                              {activeTab === "panorama_general" ? (
+                                <><Zap size={12} /><span>ANÁLISIS IA</span></>
+                              ) : (
+                                <><span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /><span>EN VIVO</span></>
+                              )}
                             </div>
                           </div>
 
@@ -759,8 +784,15 @@ export default function App() {
                             </div>
                           )}
 
-                          {/* News cards */}
-                          <div className="p-6">
+                          {/* News cards — only for the 4 category tabs, not for panorama */}
+                          {activeTab === "panorama_general" && !activeTabReport && (
+                            <div className="p-12 text-center text-stone-400 space-y-3">
+                              <FileText size={28} className="mx-auto opacity-20" />
+                              <p className="text-sm font-medium">El informe diario se genera automáticamente cada mañana.</p>
+                              <p className="text-[11px]">Presiona "Actualizar monitor" para generar ahora.</p>
+                            </div>
+                          )}
+                          <div className={cn("p-6", activeTab === "panorama_general" && "hidden")}>
                             {isLoadingNews ? (
                               <div className="flex items-center justify-center py-16 gap-3 text-stone-400">
                                 <Loader2 size={18} className="animate-spin" />
