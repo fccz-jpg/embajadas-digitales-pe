@@ -498,52 +498,45 @@ async function generateCategoryReport(location, category) {
   const cats = category === 'panorama_general'
     ? ['politico', 'economico', 'cultural', 'relaciones_internacionales']
     : [category];
-  const allNews = (await Promise.all(cats.map(c => fetchCategoryNews(location, c)))).flat();
+  const allNewsRaw = (await Promise.all(cats.map(c => fetchCategoryNews(location, c)))).flat();
+
+  // Filter to only TODAY's news
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayNews = allNewsRaw.filter(n => {
+    if (!n.date) return true; // keep if no date info
+    const d = new Date(n.date);
+    return !isNaN(d) && d >= todayStart;
+  });
+  // Fall back to most recent 8 articles if today has fewer than 3
+  const allNews = todayNews.length >= 3 ? todayNews : allNewsRaw.slice(0, 8);
 
   const newsContext = allNews.length > 0
     ? allNews.map(n =>
-        `• [${n.source}] ${n.title}${n.preview && n.preview !== n.title ? ' — ' + n.preview.slice(0, 200) : ''} (${n.date ? new Date(n.date).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'reciente'})`
+        `• [${n.source}] ${n.title}${n.preview && n.preview !== n.title ? ': ' + n.preview.slice(0, 150) : ''}`
       ).join('\n')
-    : 'No se encontraron artículos en los RSS monitoreados en este período.';
+    : 'No se encontraron noticias del día en los RSS monitoreados.';
 
   const today = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
 
-  const systemPrompt = `Eres un analista de inteligencia estratégica del MRE del Perú. Redactas reportes diarios CONCISOS basados EXCLUSIVAMENTE en las noticias reales proporcionadas. Cada sección debe ser breve y directa al punto. No inventas eventos ni fuentes.`;
+  const systemPrompt = `Eres un analista de inteligencia estratégica del MRE del Perú. Redactas síntesis periodísticas breves basadas EXCLUSIVAMENTE en las noticias proporcionadas. No inventas hechos ni fuentes.`;
 
-  const userPrompt = `Genera el REPORTE DIARIO ${label.toUpperCase()} sobre ${location} — ${today}.
+  const userPrompt = `Escribe UN SOLO PÁRRAFO de máximo 120 palabras que resuma las noticias más relevantes de HOY en materia de ${focus} para ${location}.
 
-NOTICIAS DISPONIBLES (RSS de medios locales):
+NOTICIAS DEL DÍA:
 ${newsContext}
 
-ENFOQUE: ${focus}
-
-ESTRUCTURA (títulos exactos en mayúsculas, cada sección máximo 80 palabras):
-
-REPORTE DIARIO: ${label.toUpperCase()} — ${today}
-
-1. SITUACIÓN DEL DÍA
-2-3 oraciones con los hechos más importantes del día. Cita el medio entre paréntesis.
-
-2. DESARROLLO DÍA A DÍA
-Una línea por evento ordenado por fecha. Formato: "Fecha — hecho (Fuente)."
-
-3. ACTORES Y ACCIONES RECIENTES
-Actores clave y qué hicieron. Máximo 2-3 actores, una oración cada uno.
-
-4. CONTEXTO NECESARIO
-1 párrafo breve de antecedentes imprescindibles para entender el día.
-${category === 'panorama_general' ? `
-5. POSICIÓN OFICIAL DEL PERÚ
-1-2 oraciones sobre declaraciones del gobierno peruano o la Cancillería respecto a ${location}. Si no hay: "Sin declaración oficial del Perú en el período."` : ''}
-
-REGLAS: prosa directa, sin viñetas, sin asteriscos, máximo 350 palabras en total, tono analítico profesional.
-${category !== 'panorama_general' ? 'No menciones relaciones bilaterales con Perú.' : ''}`;
+INSTRUCCIONES:
+- Un solo párrafo continuo, sin títulos, sin numeración, sin viñetas.
+- Menciona los hechos concretos y cita la fuente entre paréntesis.
+- Si son pocas noticias, sintetiza lo que hay sin inventar.
+- Máximo 120 palabras.${category === 'panorama_general' ? '\n- Al final añade una oración sobre la posición oficial del Perú respecto a estos hechos, si la hay.' : ''}`;
 
   // 2. Call Claude with streaming
   const ai = getAI();
   const stream = ai.messages.stream({
     model: 'claude-opus-4-6',
-    max_tokens: 1500,
+    max_tokens: 600,
     thinking: { type: 'adaptive' },
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
@@ -834,105 +827,63 @@ app.post("/api/export-word", async (req, res) => {
       }),
     );
 
-    // One section per category
+    // One section per category — paragraph + source links
     for (const { cat, row } of reportRows) {
       if (!row) continue;
       const label = catLabels[cat];
       const contentObj = typeof row.content === "string" ? JSON.parse(row.content) : row.content;
       const text = (contentObj.text || "").trim();
+      const catSources = Array.isArray(contentObj.sources) ? contentObj.sources : [];
       if (!text) continue;
 
-      // Section heading with colored rule
+      // Section heading
       children.push(
         new Paragraph({
-          pageBreakBefore: true,
+          pageBreakBefore: children.length > 6,
           heading: HeadingLevel.HEADING_1,
           children: [new TextRun({ text: label.toUpperCase(), bold: true, size: 28, font: "Arial", color: "1B3A6B" })],
           border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "1B3A6B", space: 4 } },
-          spacing: { after: 240 },
+          spacing: { after: 200 },
         }),
       );
 
-      // Parse and render each sub-section
-      const sections = parseSections(text);
-      for (const section of sections) {
-        const lines = section.split("\n");
-        const firstLine = lines[0].trim();
-        const isMainTitle = firstLine.startsWith("REPORTE DIARIO");
-        const isSectionTitle = /^\d+\.\s[A-ZÁÉÍÓÚÑ]/.test(firstLine);
-        const body = lines.slice(1).join(" ").trim();
-
-        if (isMainTitle) continue; // skip redundant title
-
-        if (isSectionTitle) {
-          children.push(
-            new Paragraph({
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 240, after: 120 },
-              children: [new TextRun({ text: firstLine, bold: true, size: 22, font: "Arial", color: "C0392B" })],
-            }),
-          );
-          if (body) {
-            children.push(
-              new Paragraph({
-                alignment: AlignmentType.JUSTIFIED,
-                spacing: { after: 160 },
-                children: [new TextRun({ text: body, size: 20, font: "Arial" })],
-              }),
-            );
-          }
-        } else {
-          children.push(
-            new Paragraph({
-              alignment: AlignmentType.JUSTIFIED,
-              spacing: { after: 160 },
-              children: [new TextRun({ text: section, size: 20, font: "Arial" })],
-            }),
-          );
-        }
-      }
-    }
-
-    // References section (APA 7)
-    if (refs.length > 0) {
+      // Single paragraph
       children.push(
         new Paragraph({
-          pageBreakBefore: true,
-          heading: HeadingLevel.HEADING_1,
-          children: [new TextRun({ text: "REFERENCIAS", bold: true, size: 28, font: "Arial", color: "1B3A6B" })],
-          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "1B3A6B", space: 4 } },
+          alignment: AlignmentType.JUSTIFIED,
           spacing: { after: 240 },
-        }),
-        new Paragraph({
-          spacing: { after: 160 },
-          children: [new TextRun({ text: "Formato: APA 7.ª edición", italics: true, size: 18, font: "Arial", color: "888888" })],
+          children: [new TextRun({ text, size: 20, font: "Arial" })],
         }),
       );
 
-      for (const r of refs) {
-        // APA 7 format: Source. (Date). Title. URL
-        const citeParts = [];
-        citeParts.push(new TextRun({ text: `${r.pub}`, bold: true, size: 18, font: "Arial" }));
-        if (r.dateApa) citeParts.push(new TextRun({ text: ` (${r.dateApa}). `, size: 18, font: "Arial" }));
-        else citeParts.push(new TextRun({ text: `. `, size: 18, font: "Arial" }));
-        citeParts.push(new TextRun({ text: `${r.title}. `, italics: true, size: 18, font: "Arial" }));
-        if (r.url) {
-          citeParts.push(
+      // Source links for this category
+      if (catSources.length > 0) {
+        children.push(
+          new Paragraph({
+            spacing: { after: 80 },
+            children: [new TextRun({ text: "Fuentes:", bold: true, size: 18, font: "Arial", color: "555555" })],
+          }),
+        );
+        for (const s of catSources) {
+          if (!s.url) continue;
+          const linkParts = [
+            new TextRun({ text: `${s.source || "Fuente"}: `, bold: true, size: 17, font: "Arial", color: "555555" }),
+          ];
+          linkParts.push(
             new ExternalHyperlink({
-              link: r.url,
-              children: [new TextRun({ text: r.url, style: "Hyperlink", size: 18, font: "Arial",
+              link: s.url,
+              children: [new TextRun({ text: s.url, style: "Hyperlink", size: 17, font: "Arial",
                 underline: { type: UnderlineType.SINGLE }, color: "1B3A6B" })],
             }),
           );
+          children.push(
+            new Paragraph({
+              spacing: { after: 60 },
+              indent: { left: 360 },
+              children: linkParts,
+            }),
+          );
         }
-        children.push(
-          new Paragraph({
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { before: 0, after: 120 },
-            indent: { left: 720, hanging: 720 },
-            children: citeParts,
-          }),
-        );
       }
     }
 

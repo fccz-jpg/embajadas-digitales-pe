@@ -757,60 +757,42 @@ export default function App() {
                           </div>
 
                           {/* Daily briefing — shown BEFORE news if a report exists */}
-                          {activeTabReport && getReportText(activeTabReport, activeTab) && (
-                            <div className="border-b border-stone-200">
-                              <div className="px-6 pt-5 pb-2 flex items-center justify-between">
-                                <span className="text-[9px] font-black tracking-[0.2em] text-stone-400 flex items-center gap-1.5">
-                                  <Zap size={11} className="text-mre-blue" />
-                                  REPORTE DIARIO IA — {format(new Date(activeTabReport.createdAt), "dd MMM yyyy", { locale: es }).toUpperCase()}
-                                </span>
-                                <span className="text-[8px] text-stone-300 font-bold tracking-widest">GENERADO POR CLAUDE</span>
-                              </div>
-                              <div className="px-6 pb-6">
-                                <div className="bg-stone-50 border border-stone-100 rounded-xl p-6 text-[13px] leading-relaxed text-stone-800 space-y-5
-                                  [&_p]:mb-0
-                                  ">
-                                  {getReportText(activeTabReport, activeTab)
-                                    .split(/\n(?=\d+\.\s[A-ZÁÉÍÓÚÑ]|REPORTE DIARIO)/)
-                                    .filter(s => s.trim())
-                                    .map((section, i) => {
-                                      const lines = section.trim().split('\n');
-                                      const firstLine = lines[0].trim();
-                                      const isMainTitle = firstLine.startsWith('REPORTE DIARIO');
-                                      const isSectionTitle = /^\d+\.\s[A-ZÁÉÍÓÚÑ]/.test(firstLine);
-                                      const isSubsection = /^\d+\.\d+\./.test(firstLine);
-                                      const body = lines.slice(1).join('\n').trim();
-                                      if (isMainTitle) return (
-                                        <div key={i} className="pb-3 border-b-2 border-stone-800 mb-2">
-                                          <p className="text-[11px] font-black tracking-[0.15em] text-stone-800">{firstLine}</p>
-                                        </div>
-                                      );
-                                      if (isSectionTitle) return (
-                                        <div key={i} className="space-y-2 pt-2 border-t border-stone-200 first:border-t-0 first:pt-0">
-                                          <p className="text-[10px] font-black tracking-[0.12em] text-red-700">{firstLine}</p>
-                                          {body.split(/\n(?=\d+\.\d+\.)/).map((sub, j) => {
-                                            const subLines = sub.trim().split('\n');
-                                            const subFirst = subLines[0].trim();
-                                            const isSubTitle = /^\d+\.\d+\./.test(subFirst);
-                                            const subBody = subLines.slice(isSubTitle ? 1 : 0).join(' ').trim();
-                                            return isSubTitle ? (
-                                              <div key={j} className="space-y-1">
-                                                <p className="text-[10px] font-bold text-stone-600">{subFirst}</p>
-                                                <p className="text-stone-700">{subBody}</p>
-                                              </div>
-                                            ) : (
-                                              <p key={j} className="text-stone-700">{subFirst}{subBody ? ' ' + subBody : ''}</p>
-                                            );
-                                          })}
-                                        </div>
-                                      );
-                                      return <p key={i} className="text-stone-700">{section.trim()}</p>;
-                                    })
-                                  }
+                          {activeTabReport && getReportText(activeTabReport, activeTab) && (() => {
+                            const reportText = getReportText(activeTabReport, activeTab).trim();
+                            const sources: { title: string; source: string; url: string }[] =
+                              (() => { try { const c = typeof activeTabReport.content === "string" ? JSON.parse(activeTabReport.content) : activeTabReport.content; return Array.isArray(c.sources) ? c.sources : []; } catch { return []; } })();
+                            return (
+                              <div className="border-b border-stone-200">
+                                <div className="px-6 pt-5 pb-2 flex items-center justify-between">
+                                  <span className="text-[9px] font-black tracking-[0.2em] text-stone-400 flex items-center gap-1.5">
+                                    <Zap size={11} className="text-mre-blue" />
+                                    SÍNTESIS IA — {format(new Date(activeTabReport.createdAt), "dd MMM yyyy", { locale: es }).toUpperCase()}
+                                  </span>
+                                  <span className="text-[8px] text-stone-300 font-bold tracking-widest">GENERADO POR CLAUDE</span>
+                                </div>
+                                <div className="px-6 pb-6 space-y-4">
+                                  {/* Paragraph */}
+                                  <p className="bg-stone-50 border border-stone-100 rounded-xl px-5 py-4 text-[13px] leading-relaxed text-stone-800">
+                                    {reportText}
+                                  </p>
+                                  {/* Source links */}
+                                  {sources.length > 0 && (
+                                    <div className="space-y-1">
+                                      <p className="text-[9px] font-black tracking-widest text-stone-400">FUENTES</p>
+                                      {sources.map((s, i) => (
+                                        <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center gap-2 text-[11px] text-mre-blue hover:underline truncate">
+                                          <ExternalLink size={10} className="shrink-0" />
+                                          <span className="font-medium text-stone-500 shrink-0">{s.source}:</span>
+                                          <span className="truncate">{s.url}</span>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                           {/* News cards — only for the 4 category tabs, not for panorama */}
                           {activeTab === "panorama_general" && (
