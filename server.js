@@ -6,6 +6,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import pg from "pg";
 import cron from "node-cron";
 import Parser from "rss-parser";
+import {
+  Document, Packer, Paragraph, TextRun, Header, Footer,
+  AlignmentType, HeadingLevel, BorderStyle, PageNumber,
+  ExternalHyperlink, LevelFormat, UnderlineType,
+} from "docx";
 
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -724,6 +729,278 @@ cron.schedule("0 12 * * *", async () => {
   }
   console.log(`[${new Date().toISOString()}] Generación diaria completada.`);
 }, { timezone: "UTC" });
+
+// ── Exportar Informe Diario como Word (.docx) ───────────────────────────────
+app.post("/api/export-word", async (req, res) => {
+  const { location } = req.body;
+  if (!location) return res.status(400).json({ error: "location requerido" });
+
+  try {
+    // Fetch latest report per category for this location
+    const cats = ["politico", "economico", "cultural", "relaciones_internacionales", "panorama_general"];
+    const catLabels = {
+      politico: "Político",
+      economico: "Económico",
+      cultural: "Cultural",
+      relaciones_internacionales: "Relaciones Internacionales",
+      panorama_general: "Panorama General",
+    };
+
+    const reportRows = await Promise.all(cats.map(async (cat) => {
+      const { rows } = await pool.query(
+        `SELECT content, news_items, created_at FROM reports
+         WHERE location = $1 AND category = $2
+         ORDER BY created_at DESC LIMIT 1`,
+        [location, cat]
+      );
+      return { cat, row: rows[0] || null };
+    }));
+
+    // Collect all news items across categories for references
+    const allNewsMap = new Map(); // url → news item (deduplicated)
+    reportRows.forEach(({ row }) => {
+      if (!row) return;
+      const items = Array.isArray(row.news_items) ? row.news_items : JSON.parse(row.news_items || "[]");
+      items.forEach(n => { if (n.url) allNewsMap.set(n.url, n); });
+    });
+    const allNews = [...allNewsMap.values()];
+
+    // Format date
+    const today = new Date();
+    const dateStr = today.toLocaleDateString("es-PE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+    const fileDate = today.toISOString().split("T")[0];
+
+    // ── APA 7th edition citation builder ────────────────────────────────────
+    // Format: Apellido, I. (Año, Mes Día). Título del artículo. *Nombre del medio*. URL
+    function apaCitation(news, index) {
+      const pub = news.source || "Fuente desconocida";
+      let dateApa = "";
+      if (news.date) {
+        const d = new Date(news.date);
+        if (!isNaN(d)) {
+          dateApa = d.toLocaleDateString("es-PE", { year: "numeric", month: "long", day: "2-digit" });
+        }
+      }
+      const title = (news.title || "Sin título").trim();
+      const url = news.url || "";
+      // APA 7 for news org (no individual author): Source. (Date). Title. *Publication*. URL
+      return { index: index + 1, pub, dateApa, title, url };
+    }
+
+    const refs = allNews.map((n, i) => apaCitation(n, i));
+
+    // ── Helper: split report text into titled sections ───────────────────────
+    function parseSections(text) {
+      if (!text) return [];
+      const blocks = text.split(/\n(?=\d+\.\s[A-ZÁÉÍÓÚÑ]|REPORTE DIARIO)/);
+      return blocks.map(b => b.trim()).filter(Boolean);
+    }
+
+    // ── Build docx children ──────────────────────────────────────────────────
+    const children = [];
+
+    // Cover / Title
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 480, after: 120 },
+        children: [new TextRun({ text: "MINISTERIO DE RELACIONES EXTERIORES DEL PERÚ", bold: true, size: 22, font: "Arial", color: "1B3A6B" })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 80 },
+        children: [new TextRun({ text: "Embajadas Digitales — Monitor Geopolítico", size: 20, font: "Arial", color: "555555" })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "C0392B", space: 1 } },
+        spacing: { before: 0, after: 400 },
+        children: [new TextRun({ text: "" })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 80 },
+        children: [new TextRun({ text: `INFORME DIARIO CONSOLIDADO`, bold: true, size: 36, font: "Arial", color: "1B3A6B" })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 80 },
+        children: [new TextRun({ text: location.toUpperCase(), bold: true, size: 28, font: "Arial", color: "C0392B" })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 480 },
+        children: [new TextRun({ text: dateStr.toUpperCase(), size: 20, font: "Arial", color: "888888" })],
+      }),
+    );
+
+    // One section per category
+    for (const { cat, row } of reportRows) {
+      if (!row) continue;
+      const label = catLabels[cat];
+      const contentObj = typeof row.content === "string" ? JSON.parse(row.content) : row.content;
+      const text = (contentObj.text || "").trim();
+      if (!text) continue;
+
+      // Section heading with colored rule
+      children.push(
+        new Paragraph({
+          pageBreakBefore: true,
+          heading: HeadingLevel.HEADING_1,
+          children: [new TextRun({ text: label.toUpperCase(), bold: true, size: 28, font: "Arial", color: "1B3A6B" })],
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "1B3A6B", space: 4 } },
+          spacing: { after: 240 },
+        }),
+      );
+
+      // Parse and render each sub-section
+      const sections = parseSections(text);
+      for (const section of sections) {
+        const lines = section.split("\n");
+        const firstLine = lines[0].trim();
+        const isMainTitle = firstLine.startsWith("REPORTE DIARIO");
+        const isSectionTitle = /^\d+\.\s[A-ZÁÉÍÓÚÑ]/.test(firstLine);
+        const body = lines.slice(1).join(" ").trim();
+
+        if (isMainTitle) continue; // skip redundant title
+
+        if (isSectionTitle) {
+          children.push(
+            new Paragraph({
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 240, after: 120 },
+              children: [new TextRun({ text: firstLine, bold: true, size: 22, font: "Arial", color: "C0392B" })],
+            }),
+          );
+          if (body) {
+            children.push(
+              new Paragraph({
+                alignment: AlignmentType.JUSTIFIED,
+                spacing: { after: 160 },
+                children: [new TextRun({ text: body, size: 20, font: "Arial" })],
+              }),
+            );
+          }
+        } else {
+          children.push(
+            new Paragraph({
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 160 },
+              children: [new TextRun({ text: section, size: 20, font: "Arial" })],
+            }),
+          );
+        }
+      }
+    }
+
+    // References section (APA 7)
+    if (refs.length > 0) {
+      children.push(
+        new Paragraph({
+          pageBreakBefore: true,
+          heading: HeadingLevel.HEADING_1,
+          children: [new TextRun({ text: "REFERENCIAS", bold: true, size: 28, font: "Arial", color: "1B3A6B" })],
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "1B3A6B", space: 4 } },
+          spacing: { after: 240 },
+        }),
+        new Paragraph({
+          spacing: { after: 160 },
+          children: [new TextRun({ text: "Formato: APA 7.ª edición", italics: true, size: 18, font: "Arial", color: "888888" })],
+        }),
+      );
+
+      for (const r of refs) {
+        // APA 7 format: Source. (Date). Title. URL
+        const citeParts = [];
+        citeParts.push(new TextRun({ text: `${r.pub}`, bold: true, size: 18, font: "Arial" }));
+        if (r.dateApa) citeParts.push(new TextRun({ text: ` (${r.dateApa}). `, size: 18, font: "Arial" }));
+        else citeParts.push(new TextRun({ text: `. `, size: 18, font: "Arial" }));
+        citeParts.push(new TextRun({ text: `${r.title}. `, italics: true, size: 18, font: "Arial" }));
+        if (r.url) {
+          citeParts.push(
+            new ExternalHyperlink({
+              link: r.url,
+              children: [new TextRun({ text: r.url, style: "Hyperlink", size: 18, font: "Arial",
+                underline: { type: UnderlineType.SINGLE }, color: "1B3A6B" })],
+            }),
+          );
+        }
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { before: 0, after: 120 },
+            indent: { left: 720, hanging: 720 },
+            children: citeParts,
+          }),
+        );
+      }
+    }
+
+    // ── Build document ───────────────────────────────────────────────────────
+    const doc = new Document({
+      styles: {
+        default: {
+          document: { run: { font: "Arial", size: 20 } },
+        },
+        paragraphStyles: [
+          { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true,
+            run: { size: 28, bold: true, font: "Arial", color: "1B3A6B" },
+            paragraph: { spacing: { before: 240, after: 120 }, outlineLevel: 0 } },
+          { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
+            run: { size: 22, bold: true, font: "Arial", color: "C0392B" },
+            paragraph: { spacing: { before: 200, after: 100 }, outlineLevel: 1 } },
+        ],
+      },
+      sections: [{
+        properties: {
+          page: {
+            size: { width: 11906, height: 16838 }, // A4
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+          },
+        },
+        headers: {
+          default: new Header({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC", space: 1 } },
+                children: [
+                  new TextRun({ text: `MRE PERÚ — Monitor Geopolítico — ${location}`, size: 16, font: "Arial", color: "888888" }),
+                ],
+              }),
+            ],
+          }),
+        },
+        footers: {
+          default: new Footer({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                border: { top: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC", space: 1 } },
+                children: [
+                  new TextRun({ text: "Página ", size: 16, font: "Arial", color: "888888" }),
+                  new TextRun({ children: [PageNumber.CURRENT], size: 16, font: "Arial", color: "888888" }),
+                  new TextRun({ text: " de ", size: 16, font: "Arial", color: "888888" }),
+                  new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, font: "Arial", color: "888888" }),
+                  new TextRun({ text: `   •   Documento generado automáticamente — ${dateStr}`, size: 16, font: "Arial", color: "AAAAAA" }),
+                ],
+              }),
+            ],
+          }),
+        },
+        children,
+      }],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="Informe_MRE_${location.replace(/\s+/g, "_")}_${fileDate}.docx"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error("Error generando Word:", err.message);
+    res.status(500).json({ error: "Error al generar el documento Word: " + err.message });
+  }
+});
 
 // ── Static files ────────────────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, "dist")));

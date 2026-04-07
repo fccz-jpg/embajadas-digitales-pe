@@ -115,6 +115,7 @@ export default function App() {
   const [isUpdatingMedia, setIsUpdatingMedia] = useState(false);
   const [liveNews, setLiveNews] = useState<NewsItem[]>([]);
   const [isLoadingNews, setIsLoadingNews] = useState(false);
+  const [isExportingWord, setIsExportingWord] = useState(false);
 
   // Fetch live RSS news whenever location or active tab changes
   useEffect(() => {
@@ -241,6 +242,33 @@ export default function App() {
       console.error("Failed to update media database", err);
     } finally {
       setIsUpdatingMedia(false);
+    }
+  }, [location]);
+
+  // Export consolidated daily report as Word (.docx)
+  const handleExportWord = useCallback(async () => {
+    setIsExportingWord(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/export-word", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location }),
+      });
+      if (!res.ok) throw new Error("Error al generar el documento");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const today = new Date().toISOString().split("T")[0];
+      a.download = `Informe_MRE_${location.replace(/\s+/g, "_")}_${today}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError("No se pudo exportar el informe Word. Intente de nuevo.");
+      console.error("Export Word failed", err);
+    } finally {
+      setIsExportingWord(false);
     }
   }, [location]);
 
@@ -785,6 +813,23 @@ export default function App() {
                           )}
 
                           {/* News cards — only for the 4 category tabs, not for panorama */}
+                          {activeTab === "panorama_general" && (
+                            <div className="px-6 pb-4 flex items-center justify-between border-b border-stone-100">
+                              <div className="text-[10px] font-bold text-stone-400 tracking-widest">
+                                {activeTabReport ? "INFORME GENERADO — LISTO PARA EXPORTAR" : "SIN INFORME GENERADO AÚN"}
+                              </div>
+                              <button
+                                onClick={handleExportWord}
+                                disabled={isExportingWord || !activeTabReport}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-full text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                              >
+                                {isExportingWord
+                                  ? <><Loader2 size={13} className="animate-spin" /> Generando Word...</>
+                                  : <><Download size={13} /> Descargar Informe Word (.docx)</>
+                                }
+                              </button>
+                            </div>
+                          )}
                           {activeTab === "panorama_general" && !activeTabReport && (
                             <div className="p-12 text-center text-stone-400 space-y-3">
                               <FileText size={28} className="mx-auto opacity-20" />
