@@ -545,7 +545,7 @@ REGLAS: máximo 150 palabras en total. Sin viñetas. Sin asteriscos. Sin numerac
   // 2. Call Claude (no thinking needed for short structured output)
   const ai = getAI();
   const stream = ai.messages.stream({
-    model: 'claude-opus-4-6',
+    model: 'claude-haiku-4-5',
     max_tokens: 1024,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
@@ -572,7 +572,7 @@ REGLAS: máximo 150 palabras en total. Sin viñetas. Sin asteriscos. Sin numerac
     `INSERT INTO reports (location, category, content, raw_news, news_items)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id, location, category, content, news_items, created_at`,
-    [location, category, JSON.stringify({ text, sources }), `RSS + Claude claude-opus-4-6`, JSON.stringify(newsItems)]
+    [location, category, JSON.stringify({ text, sources }), `RSS + Claude claude-haiku-4-5`, JSON.stringify(newsItems)]
   );
 
   const r = rows[0];
@@ -675,7 +675,7 @@ app.post("/api/media", async (req, res) => {
   try {
     const ai = getAI();
     const stream = ai.messages.stream({
-      model: "claude-opus-4-6",
+      model: "claude-haiku-4-5",
       max_tokens: 2048,
       thinking: { type: "adaptive" },
       system:
