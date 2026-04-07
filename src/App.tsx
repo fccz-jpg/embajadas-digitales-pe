@@ -317,6 +317,17 @@ export default function App() {
   const riskLevel = criticalAlerts === 0 ? "Bajo" : criticalAlerts <= 3 ? "Medio" : "Alto";
   const riskColor = criticalAlerts === 0 ? "text-green-600" : criticalAlerts <= 3 ? "text-amber-500" : "text-red-600";
   const riskIconColor = criticalAlerts === 0 ? "text-green-500" : criticalAlerts <= 3 ? "text-amber-400" : "text-red-500";
+  // Top critical headline driving the risk level
+  const topCriticalNews = allCategoryNews
+    .filter(n => CRISIS_KW.some(k => `${n.title} ${n.preview ?? ""}`.toLowerCase().includes(k)))
+    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0];
+  const riskReason = riskLevel === "Alto" && topCriticalNews
+    ? topCriticalNews.title.length > 80
+      ? topCriticalNews.title.slice(0, 77) + "…"
+      : topCriticalNews.title
+    : riskLevel === "Medio" && topCriticalNews
+    ? `${criticalAlerts} alertas detectadas`
+    : null;
   const politicalNews = allCategoryNews.filter(n => n.category === "politico");
   const economicNews = allCategoryNews.filter(n => n.category === "economico");
   const polCrisis = politicalNews.filter(n => CRISIS_KW.some(k => `${n.title} ${n.preview ?? ""}`.toLowerCase().includes(k))).length;
@@ -580,15 +591,20 @@ export default function App() {
                       <AlertTriangle className="text-amber-500" size={18} />
                     </div>
                   </div>
-                  <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                  <div className={`border p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow ${riskLevel === "Alto" ? "bg-red-50 border-red-100" : riskLevel === "Medio" ? "bg-amber-50 border-amber-100" : "bg-white border-stone-100"}`}>
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Nivel de riesgo</p>
-                    <p className="text-[9px] text-stone-400 mb-2">Basado en cobertura del día</p>
-                    <div className="flex items-end justify-between">
+                    <div className="flex items-end justify-between mb-1">
                       <span className={`text-2xl font-bold tracking-tighter ${allCategoryNews.length > 0 ? riskColor : "text-stone-400"}`}>
                         {allCategoryNews.length > 0 ? riskLevel : "—"}
                       </span>
                       <Activity className={allCategoryNews.length > 0 ? riskIconColor : "text-stone-300"} size={18} />
                     </div>
+                    {riskReason && (
+                      <p className="text-[9px] text-stone-500 leading-tight line-clamp-2">{riskReason}</p>
+                    )}
+                    {!riskReason && allCategoryNews.length > 0 && (
+                      <p className="text-[9px] text-stone-400">Sin alertas críticas detectadas</p>
+                    )}
                   </div>
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Análisis IA</p>
