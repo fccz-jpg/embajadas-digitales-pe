@@ -797,21 +797,6 @@ export default function App() {
                                       </div>
                                     ))}
                                   </div>
-                                  {/* Source links */}
-                                  {sources.length > 0 && (
-                                    <div className="space-y-1 pt-1">
-                                      <p className="text-[9px] font-black tracking-widest text-stone-400">FUENTES</p>
-                                      {sources.map((s, i) => (
-                                        <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
-                                          className="flex items-center gap-2 text-[11px] hover:underline truncate group">
-                                          <ExternalLink size={10} className="shrink-0 text-stone-400 group-hover:text-mre-blue" />
-                                          <span className="font-bold text-stone-500 shrink-0">{s.source}</span>
-                                          <span className="text-stone-300">—</span>
-                                          <span className="truncate text-mre-blue">{s.url}</span>
-                                        </a>
-                                      ))}
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                             );
