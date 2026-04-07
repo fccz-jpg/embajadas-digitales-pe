@@ -736,10 +736,10 @@ export default function App() {
                                   <Zap size={11} className="text-mre-blue" />
                                   REPORTE DIARIO IA — {format(new Date(activeTabReport.createdAt), "dd MMM yyyy", { locale: es }).toUpperCase()}
                                 </span>
-                                <span className="text-[8px] text-stone-300 font-bold tracking-widest">GENERADO POR GEMINI</span>
+                                <span className="text-[8px] text-stone-300 font-bold tracking-widest">GENERADO POR CLAUDE</span>
                               </div>
                               <div className="px-6 pb-6">
-                                <div className="bg-stone-50 border border-stone-100 rounded-xl p-6 font-serif text-[13px] leading-relaxed text-stone-800 space-y-5
+                                <div className="bg-stone-50 border border-stone-100 rounded-xl p-6 text-[13px] leading-relaxed text-stone-800 space-y-5
                                   [&_p]:mb-0
                                   ">
                                   {getReportText(activeTabReport, activeTab)

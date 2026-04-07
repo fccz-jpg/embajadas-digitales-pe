@@ -503,47 +503,42 @@ async function generateCategoryReport(location, category) {
 
   const today = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
 
-  const systemPrompt = `Eres un analista de inteligencia estratégica del Ministerio de Relaciones Exteriores (MRE) del Perú. Generas reportes diarios de inteligencia basados EXCLUSIVAMENTE en las noticias reales proporcionadas. No inventas eventos ni fuentes. Si las noticias no cubren algún aspecto, lo indicas explícitamente.`;
+  const systemPrompt = `Eres un analista de inteligencia estratégica del MRE del Perú. Redactas reportes diarios CONCISOS basados EXCLUSIVAMENTE en las noticias reales proporcionadas. Cada sección debe ser breve y directa al punto. No inventas eventos ni fuentes.`;
 
   const userPrompt = `Genera el REPORTE DIARIO ${label.toUpperCase()} sobre ${location} — ${today}.
 
-NOTICIAS REALES DISPONIBLES (fuente: RSS de medios locales):
+NOTICIAS DISPONIBLES (RSS de medios locales):
 ${newsContext}
 
 ENFOQUE: ${focus}
 
-ESTRUCTURA OBLIGATORIA (usa exactamente estos títulos en mayúsculas):
+ESTRUCTURA (títulos exactos en mayúsculas, cada sección máximo 80 palabras):
 
 REPORTE DIARIO: ${label.toUpperCase()} — ${today}
 
 1. SITUACIÓN DEL DÍA
-Resumen ejecutivo de los hechos más relevantes basado en las noticias proporcionadas. Mínimo 150 palabras. Cita el medio entre paréntesis al mencionar cada hecho.
+2-3 oraciones con los hechos más importantes del día. Cita el medio entre paréntesis.
 
 2. DESARROLLO DÍA A DÍA
-Cronología de eventos organizados por fecha (del más antiguo al más reciente). Para cada grupo de noticias del mismo día: subtítulo con la fecha (ej. "2.1. Lunes, 06 de abril de 2026") seguido de párrafo narrativo. Cita fuentes: (Fuente: Nombre del medio).
+Una línea por evento ordenado por fecha. Formato: "Fecha — hecho (Fuente)."
 
 3. ACTORES Y ACCIONES RECIENTES
-Subsecciones por actor principal identificado en las noticias (ej. "3.1. Gobierno", "3.2. Oposición"). Descripción en prosa de sus acciones y declaraciones.
+Actores clave y qué hicieron. Máximo 2-3 actores, una oración cada uno.
 
 4. CONTEXTO NECESARIO
-Antecedentes para interpretar los eventos: marco institucional, historia reciente relevante, tendencias estructurales. Texto continuo en prosa.
+1 párrafo breve de antecedentes imprescindibles para entender el día.
 ${category === 'panorama_general' ? `
 5. POSICIÓN OFICIAL DEL PERÚ
-Basándote en tu conocimiento, indica si el gobierno del Perú, la Cancillería o el MRE han emitido declaraciones públicas sobre ${location} o los eventos del período. Cita fuentes si las conoces. Si no hay registro: "Sin declaración oficial del Perú registrada en el período monitoreado."` : ''}
+1-2 oraciones sobre declaraciones del gobierno peruano o la Cancillería respecto a ${location}. Si no hay: "Sin declaración oficial del Perú en el período."` : ''}
 
-REGLAS:
-- Texto en prosa continua, SIN listas con viñetas ni asteriscos.
-- Cita el medio entre paréntesis al mencionar cada dato.
-- Mínimo 600 palabras.
-- Tono profesional y analítico.
-${category !== 'panorama_general' ? '- No hagas referencias a Perú ni relaciones bilaterales con Perú.' : ''}
-- Si las noticias son insuficientes para alguna sección, indícalo honestamente.`;
+REGLAS: prosa directa, sin viñetas, sin asteriscos, máximo 350 palabras en total, tono analítico profesional.
+${category !== 'panorama_general' ? 'No menciones relaciones bilaterales con Perú.' : ''}`;
 
-  // 2. Call Claude with streaming (reports can be long)
+  // 2. Call Claude with streaming
   const ai = getAI();
   const stream = ai.messages.stream({
     model: 'claude-opus-4-6',
-    max_tokens: 4096,
+    max_tokens: 1500,
     thinking: { type: 'adaptive' },
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
