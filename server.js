@@ -536,34 +536,34 @@ async function generateCategoryReport(location, category) {
 
   const today = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
 
-  const systemPrompt = `Eres un analista de inteligencia estratégica del MRE del Perú. Redactas síntesis periodísticas BREVES basadas EXCLUSIVAMENTE en las noticias proporcionadas. No inventas hechos ni fuentes. Cada oración que mencione un hecho debe terminar con la cita de la fuente en formato (Nombre del medio, ${new Date().getFullYear()}).`;
+  const yr = new Date().getFullYear();
+  const systemPrompt = `Eres un analista de inteligencia estratégica del MRE del Perú. Redactas análisis periodísticos basados EXCLUSIVAMENTE en las noticias proporcionadas. No inventas hechos ni fuentes. REGLA ESTRICTA DE CITACIÓN: cada oración que mencione un hecho concreto DEBE terminar con la cita APA en texto así: (Nombre del Medio, ${yr}). Nunca omitas la cita al final de la oración.`;
 
   const sections = category === 'panorama_general'
     ? ['SITUACIÓN DEL DÍA', 'ACTORES CLAVE', 'CONTEXTO', 'POSICIÓN DEL PERÚ']
     : ['SITUACIÓN DEL DÍA', 'ACTORES CLAVE', 'CONTEXTO'];
 
-  const userPrompt = `Genera una síntesis de las noticias de HOY sobre ${focus} en ${location}.
+  const userPrompt = `Analiza las siguientes noticias de HOY sobre ${focus} en ${location} y redacta un informe estructurado.
 
 NOTICIAS DEL DÍA:
 ${newsContext}
 
-ESTRUCTURA OBLIGATORIA — usa exactamente estos subtítulos en mayúsculas, seguidos de dos puntos y el texto en la misma línea:
+ESTRUCTURA OBLIGATORIA — cada subtítulo en mayúsculas seguido de dos puntos y el texto en la misma línea:
 
-${sections.map(s => {
-  if (s === 'SITUACIÓN DEL DÍA') return `${s}: 2 oraciones máximo sobre los hechos principales. Cita la fuente al final de cada oración (Nombre del medio, ${new Date().getFullYear()}).`;
-  if (s === 'ACTORES CLAVE') return `${s}: 1 oración por actor relevante mencionado en las noticias (máximo 2 actores). Cita la fuente (Nombre del medio, ${new Date().getFullYear()}).`;
-  if (s === 'CONTEXTO') return `${s}: 1-2 oraciones de antecedentes esenciales para entender el día. Sin cita si es conocimiento general.`;
-  if (s === 'POSICIÓN DEL PERÚ') return `${s}: 1 oración sobre declaraciones del gobierno peruano o la Cancillería. Si no hay: "Sin declaración oficial registrada."`;
-  return s;
-}).join('\n')}
+SITUACIÓN DEL DÍA: 3 a 4 oraciones desarrollando los hechos más relevantes del día con sus implicaciones. Cada oración termina con (Fuente, ${yr}).
 
-REGLAS: máximo 150 palabras en total. Sin viñetas. Sin asteriscos. Sin numeración. Solo los subtítulos indicados.`;
+ACTORES CLAVE: 2 a 3 oraciones, una por actor principal. Describe qué hizo o declaró y por qué importa. Cada oración termina con (Fuente, ${yr}).
 
-  // 2. Call Claude (no thinking needed for short structured output)
+CONTEXTO: 2 a 3 oraciones explicando los antecedentes necesarios para entender los eventos del día y su tendencia. Solo citar si el dato viene de las noticias.
+${category === 'panorama_general' ? `\nPOSICIÓN DEL PERÚ: 1 a 2 oraciones sobre la postura oficial del gobierno peruano o la Cancillería respecto a ${location}. Si no hay información: "Sin declaración oficial del Perú registrada en el período."` : ''}
+
+REGLAS: prosa fluida, sin viñetas, sin asteriscos, sin numeración. Máximo 250 palabras en total. La cita (Fuente, ${yr}) va pegada al punto final de cada oración que exponga un hecho.`;
+
+  // 2. Call Claude
   const ai = getAI();
   const stream = ai.messages.stream({
     model: 'claude-haiku-4-5',
-    max_tokens: 1024,
+    max_tokens: 1500,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });
