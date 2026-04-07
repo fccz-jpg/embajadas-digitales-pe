@@ -542,12 +542,11 @@ ${sections.map(s => {
 
 REGLAS: máximo 150 palabras en total. Sin viñetas. Sin asteriscos. Sin numeración. Solo los subtítulos indicados.`;
 
-  // 2. Call Claude with streaming
+  // 2. Call Claude (no thinking needed for short structured output)
   const ai = getAI();
   const stream = ai.messages.stream({
     model: 'claude-opus-4-6',
-    max_tokens: 700,
-    thinking: { type: 'adaptive' },
+    max_tokens: 1024,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });
@@ -588,6 +587,18 @@ REGLAS: máximo 150 palabras en total. Sin viñetas. Sin asteriscos. Sin numerac
 }
 
 // ── API routes ──────────────────────────────────────────────────────────────
+
+// Limpiar reportes viejos de una location (para forzar regeneración)
+app.delete("/api/reports", async (req, res) => {
+  const { location } = req.query;
+  if (!location) return res.status(400).json({ error: "location requerido" });
+  try {
+    await pool.query("DELETE FROM reports WHERE location = $1", [location]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Generar los 4 reportes de categoría para un país
 app.post("/api/report", async (req, res) => {

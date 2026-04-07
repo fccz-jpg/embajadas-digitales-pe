@@ -175,13 +175,17 @@ export default function App() {
     setIsGenerating(true);
     setError(null);
     try {
-      const newReports: Report[] = await generateEmbassyReport(location, location);
-      const updatedCategories = new Set(newReports.map(r => r.category).filter(Boolean));
+      // Clear old reports from DB and local state first
+      await fetch(`/api/reports?location=${encodeURIComponent(location)}`, { method: "DELETE" });
       setReports(prev => {
-        const filtered = prev.filter(r =>
-          !(r.location === location && r.category && updatedCategories.has(r.category))
-        );
-        const result = [...newReports, ...filtered];
+        const filtered = prev.filter(r => r.location !== location);
+        localStorage.setItem("mre_reports", JSON.stringify(filtered));
+        return filtered;
+      });
+      // Generate fresh reports
+      const newReports: Report[] = await generateEmbassyReport(location, location);
+      setReports(prev => {
+        const result = [...newReports, ...prev.filter(r => r.location !== location)];
         localStorage.setItem("mre_reports", JSON.stringify(result));
         return result;
       });
