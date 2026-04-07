@@ -143,17 +143,19 @@ export default function App() {
     )).then(results => setAllCategoryNews((results as NewsItem[][]).flat()));
   }, [location, activeView]);
 
-  // Load reports from API (fallback to localStorage when offline)
+  // Load reports from API for current location, always prefer DB over localStorage
   useEffect(() => {
-    fetch("/api/reports")
+    fetch(`/api/reports?location=${encodeURIComponent(location)}`)
       .then(r => r.json())
       .then((apiReports: Report[]) => {
         if (apiReports.length > 0) {
-          setReports(apiReports);
-          localStorage.setItem("mre_reports", JSON.stringify(apiReports));
-        } else {
-          const saved = localStorage.getItem("mre_reports");
-          if (saved) setReports(JSON.parse(saved));
+          // Merge: keep reports from other locations + fresh ones for this location
+          setReports(prev => {
+            const others = prev.filter(r => r.location !== location);
+            const merged = [...apiReports, ...others];
+            localStorage.setItem("mre_reports", JSON.stringify(merged));
+            return merged;
+          });
         }
       })
       .catch(() => {
@@ -164,7 +166,7 @@ export default function App() {
           localStorage.removeItem("mre_reports");
         }
       });
-  }, []);
+  }, [location]);
 
   const saveReports = (newReports: Report[]) => {
     setReports(newReports);
