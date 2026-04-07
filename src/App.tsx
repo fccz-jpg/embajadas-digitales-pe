@@ -761,6 +761,17 @@ export default function App() {
                             const reportText = getReportText(activeTabReport, activeTab).trim();
                             const sources: { title: string; source: string; url: string }[] =
                               (() => { try { const c = typeof activeTabReport.content === "string" ? JSON.parse(activeTabReport.content) : activeTabReport.content; return Array.isArray(c.sources) ? c.sources : []; } catch { return []; } })();
+
+                            // Parse "SUBTÍTULO: texto" lines
+                            const SUBTITLE_RE = /^([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,}[A-ZÁÉÍÓÚÑ]):\s*(.+)/;
+                            const blocks = reportText.split('\n').filter(l => l.trim()).reduce<{title: string; text: string}[]>((acc, line) => {
+                              const m = line.trim().match(SUBTITLE_RE);
+                              if (m) { acc.push({ title: m[1], text: m[2] }); }
+                              else if (acc.length > 0) { acc[acc.length - 1].text += ' ' + line.trim(); }
+                              else { acc.push({ title: '', text: line.trim() }); }
+                              return acc;
+                            }, []);
+
                             return (
                               <div className="border-b border-stone-200">
                                 <div className="px-6 pt-5 pb-2 flex items-center justify-between">
@@ -770,21 +781,29 @@ export default function App() {
                                   </span>
                                   <span className="text-[8px] text-stone-300 font-bold tracking-widest">GENERADO POR CLAUDE</span>
                                 </div>
-                                <div className="px-6 pb-6 space-y-4">
-                                  {/* Paragraph */}
-                                  <p className="bg-stone-50 border border-stone-100 rounded-xl px-5 py-4 text-[13px] leading-relaxed text-stone-800">
-                                    {reportText}
-                                  </p>
+                                <div className="px-6 pb-5 space-y-3">
+                                  {/* Subtitle blocks */}
+                                  <div className="bg-stone-50 border border-stone-100 rounded-xl overflow-hidden divide-y divide-stone-100">
+                                    {blocks.map((block, i) => (
+                                      <div key={i} className="px-5 py-3">
+                                        {block.title && (
+                                          <p className="text-[9px] font-black tracking-[0.15em] text-red-700 mb-1">{block.title}</p>
+                                        )}
+                                        <p className="text-[13px] leading-relaxed text-stone-800">{block.text}</p>
+                                      </div>
+                                    ))}
+                                  </div>
                                   {/* Source links */}
                                   {sources.length > 0 && (
-                                    <div className="space-y-1">
+                                    <div className="space-y-1 pt-1">
                                       <p className="text-[9px] font-black tracking-widest text-stone-400">FUENTES</p>
                                       {sources.map((s, i) => (
                                         <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
-                                          className="flex items-center gap-2 text-[11px] text-mre-blue hover:underline truncate">
-                                          <ExternalLink size={10} className="shrink-0" />
-                                          <span className="font-medium text-stone-500 shrink-0">{s.source}:</span>
-                                          <span className="truncate">{s.url}</span>
+                                          className="flex items-center gap-2 text-[11px] hover:underline truncate group">
+                                          <ExternalLink size={10} className="shrink-0 text-stone-400 group-hover:text-mre-blue" />
+                                          <span className="font-bold text-stone-500 shrink-0">{s.source}</span>
+                                          <span className="text-stone-300">—</span>
+                                          <span className="truncate text-mre-blue">{s.url}</span>
                                         </a>
                                       ))}
                                     </div>

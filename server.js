@@ -519,24 +519,34 @@ async function generateCategoryReport(location, category) {
 
   const today = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
 
-  const systemPrompt = `Eres un analista de inteligencia estratégica del MRE del Perú. Redactas síntesis periodísticas breves basadas EXCLUSIVAMENTE en las noticias proporcionadas. No inventas hechos ni fuentes.`;
+  const systemPrompt = `Eres un analista de inteligencia estratégica del MRE del Perú. Redactas síntesis periodísticas BREVES basadas EXCLUSIVAMENTE en las noticias proporcionadas. No inventas hechos ni fuentes. Cada oración que mencione un hecho debe terminar con la cita de la fuente en formato (Nombre del medio, ${new Date().getFullYear()}).`;
 
-  const userPrompt = `Escribe UN SOLO PÁRRAFO de máximo 120 palabras que resuma las noticias más relevantes de HOY en materia de ${focus} para ${location}.
+  const sections = category === 'panorama_general'
+    ? ['SITUACIÓN DEL DÍA', 'ACTORES CLAVE', 'CONTEXTO', 'POSICIÓN DEL PERÚ']
+    : ['SITUACIÓN DEL DÍA', 'ACTORES CLAVE', 'CONTEXTO'];
+
+  const userPrompt = `Genera una síntesis de las noticias de HOY sobre ${focus} en ${location}.
 
 NOTICIAS DEL DÍA:
 ${newsContext}
 
-INSTRUCCIONES:
-- Un solo párrafo continuo, sin títulos, sin numeración, sin viñetas.
-- Menciona los hechos concretos y cita la fuente entre paréntesis.
-- Si son pocas noticias, sintetiza lo que hay sin inventar.
-- Máximo 120 palabras.${category === 'panorama_general' ? '\n- Al final añade una oración sobre la posición oficial del Perú respecto a estos hechos, si la hay.' : ''}`;
+ESTRUCTURA OBLIGATORIA — usa exactamente estos subtítulos en mayúsculas, seguidos de dos puntos y el texto en la misma línea:
+
+${sections.map(s => {
+  if (s === 'SITUACIÓN DEL DÍA') return `${s}: 2 oraciones máximo sobre los hechos principales. Cita la fuente al final de cada oración (Nombre del medio, ${new Date().getFullYear()}).`;
+  if (s === 'ACTORES CLAVE') return `${s}: 1 oración por actor relevante mencionado en las noticias (máximo 2 actores). Cita la fuente (Nombre del medio, ${new Date().getFullYear()}).`;
+  if (s === 'CONTEXTO') return `${s}: 1-2 oraciones de antecedentes esenciales para entender el día. Sin cita si es conocimiento general.`;
+  if (s === 'POSICIÓN DEL PERÚ') return `${s}: 1 oración sobre declaraciones del gobierno peruano o la Cancillería. Si no hay: "Sin declaración oficial registrada."`;
+  return s;
+}).join('\n')}
+
+REGLAS: máximo 150 palabras en total. Sin viñetas. Sin asteriscos. Sin numeración. Solo los subtítulos indicados.`;
 
   // 2. Call Claude with streaming
   const ai = getAI();
   const stream = ai.messages.stream({
     model: 'claude-opus-4-6',
-    max_tokens: 600,
+    max_tokens: 700,
     thinking: { type: 'adaptive' },
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
@@ -847,14 +857,33 @@ app.post("/api/export-word", async (req, res) => {
         }),
       );
 
-      // Single paragraph
-      children.push(
-        new Paragraph({
-          alignment: AlignmentType.JUSTIFIED,
-          spacing: { after: 240 },
-          children: [new TextRun({ text, size: 20, font: "Arial" })],
-        }),
-      );
+      // Parse subtitle blocks: "SUBTÍTULO: texto"
+      const subtitleRe = /^([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,}[A-ZÁÉÍÓÚÑ]):\s*(.+)/;
+      const blocks = text.split('\n').filter(l => l.trim()).reduce((acc, line) => {
+        const m = line.trim().match(subtitleRe);
+        if (m) acc.push({ title: m[1], body: m[2] });
+        else if (acc.length > 0) acc[acc.length - 1].body += ' ' + line.trim();
+        else acc.push({ title: null, body: line.trim() });
+        return acc;
+      }, []);
+
+      for (const block of blocks) {
+        if (block.title) {
+          children.push(
+            new Paragraph({
+              spacing: { before: 160, after: 60 },
+              children: [new TextRun({ text: block.title, bold: true, size: 19, font: "Arial", color: "C0392B" })],
+            }),
+          );
+        }
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 120 },
+            children: [new TextRun({ text: block.body.trim(), size: 20, font: "Arial" })],
+          }),
+        );
+      }
 
       // Source links for this category
       if (catSources.length > 0) {
