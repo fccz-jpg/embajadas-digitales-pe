@@ -175,23 +175,35 @@ export default function App() {
     setIsGenerating(true);
     setError(null);
     try {
-      // Clear old reports from DB and local state first
-      await fetch(`/api/reports?location=${encodeURIComponent(location)}`, { method: "DELETE" });
+      // Clear old reports from DB (best-effort, don't fail if it errors)
+      try {
+        await fetch(`/api/reports?location=${encodeURIComponent(location)}`, { method: "DELETE" });
+      } catch (_) { /* ignore */ }
       setReports(prev => {
         const filtered = prev.filter(r => r.location !== location);
         localStorage.setItem("mre_reports", JSON.stringify(filtered));
         return filtered;
       });
       // Generate fresh reports
-      const newReports: Report[] = await generateEmbassyReport(location, location);
+      const res = await fetch("/api/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const newReports: Report[] = await res.json();
       setReports(prev => {
         const result = [...newReports, ...prev.filter(r => r.location !== location)];
         localStorage.setItem("mre_reports", JSON.stringify(result));
         return result;
       });
       setActiveView("dashboard");
-    } catch (err) {
-      setError("Error al actualizar el monitoreo. Verifique su conexión e intente de nuevo.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Error al actualizar el monitoreo: ${msg}`);
       console.error("Failed to update monitoring", err);
     } finally {
       setIsGenerating(false);
