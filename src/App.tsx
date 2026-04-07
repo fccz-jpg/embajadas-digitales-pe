@@ -561,7 +561,8 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                    <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-2">Fuentes activas</p>
+                    <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Fuentes activas</p>
+                    <p className="text-[9px] text-stone-400 mb-2">Medios monitoreados hoy</p>
                     <div className="flex items-end justify-between">
                       <span className="text-2xl font-bold text-stone-900 tracking-tighter">
                         {uniqueSources > 0 ? uniqueSources : "—"}
@@ -570,7 +571,8 @@ export default function App() {
                     </div>
                   </div>
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                    <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-2">Alertas críticas</p>
+                    <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Alertas críticas</p>
+                    <p className="text-[9px] text-stone-400 mb-2">Noticias de alto impacto</p>
                     <div className="flex items-end justify-between">
                       <span className="text-2xl font-bold text-stone-900 tracking-tighter">
                         {allCategoryNews.length > 0 ? criticalAlerts : "—"}
@@ -579,7 +581,8 @@ export default function App() {
                     </div>
                   </div>
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                    <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-2">Nivel de riesgo</p>
+                    <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Nivel de riesgo</p>
+                    <p className="text-[9px] text-stone-400 mb-2">Basado en cobertura del día</p>
                     <div className="flex items-end justify-between">
                       <span className={`text-2xl font-bold tracking-tighter ${allCategoryNews.length > 0 ? riskColor : "text-stone-400"}`}>
                         {allCategoryNews.length > 0 ? riskLevel : "—"}
@@ -588,7 +591,8 @@ export default function App() {
                     </div>
                   </div>
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                    <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-2">Análisis IA</p>
+                    <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Análisis IA</p>
+                    <p className="text-[9px] text-stone-400 mb-2">Reportes generados hoy</p>
                     <div className="flex items-end justify-between">
                       <span className="text-2xl font-bold text-stone-900 tracking-tighter">
                         {reports.filter(r => r.location === location).length}
