@@ -322,6 +322,17 @@ export default function App() {
   const topCriticalNews = allCategoryNews
     .filter(n => CRISIS_KW.some(k => `${n.title} ${n.preview ?? ""}`.toLowerCase().includes(k)))
     .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0];
+  // Fuentes activas: lista de nombres de medios únicos
+  const uniqueSourceNames = [...new Set(allCategoryNews.map(n => n.source).filter(Boolean))];
+  const sourceSummary = uniqueSourceNames.length > 0
+    ? uniqueSourceNames.slice(0, 3).join(", ") + (uniqueSourceNames.length > 3 ? ` +${uniqueSourceNames.length - 3} más` : "")
+    : null;
+  // Análisis IA: qué categorías tienen reporte
+  const reportedCats = reports.filter(r => r.location === location).map(r => r.category);
+  const catLabels: Record<string, string> = { politico: "Político", economico: "Económico", cultural: "Cultural", relaciones_internacionales: "RR.Int." };
+  const analysisSummary = reportedCats.length > 0
+    ? reportedCats.map(c => catLabels[c] ?? c).join(" · ")
+    : null;
   const riskReason = riskLevel === "Alto" && topCriticalNews
     ? topCriticalNews.title.length > 80
       ? topCriticalNews.title.slice(0, 77) + "…"
@@ -574,23 +585,40 @@ export default function App() {
                 <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Fuentes activas</p>
-                    <p className="text-[9px] text-stone-400 mb-2">Medios monitoreados hoy</p>
-                    <div className="flex items-end justify-between">
+                    <div className="flex items-end justify-between mb-1">
                       <span className="text-2xl font-bold text-stone-900 tracking-tighter">
                         {uniqueSources > 0 ? uniqueSources : "—"}
                       </span>
                       <Radio className="text-mre-blue" size={18} />
                     </div>
+                    {sourceSummary && (
+                      <p className="text-[9px] text-stone-500 leading-tight line-clamp-2">{sourceSummary}</p>
+                    )}
+                    {!sourceSummary && (
+                      <p className="text-[9px] text-stone-400">Sin fuentes cargadas</p>
+                    )}
                   </div>
-                  <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                  <div
+                    onClick={() => topCriticalNews && setRiskModalOpen(true)}
+                    className={`border p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow ${topCriticalNews ? "cursor-pointer" : ""} ${criticalAlerts > 0 ? "bg-amber-50 border-amber-100" : "bg-white border-stone-100"}`}>
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Alertas críticas</p>
-                    <p className="text-[9px] text-stone-400 mb-2">Noticias de alto impacto</p>
-                    <div className="flex items-end justify-between">
+                    <div className="flex items-end justify-between mb-1">
                       <span className="text-2xl font-bold text-stone-900 tracking-tighter">
                         {allCategoryNews.length > 0 ? criticalAlerts : "—"}
                       </span>
-                      <AlertTriangle className="text-amber-500" size={18} />
+                      <AlertTriangle className={criticalAlerts > 0 ? "text-amber-500" : "text-stone-300"} size={18} />
                     </div>
+                    {topCriticalNews && (
+                      <p className="text-[9px] text-stone-500 leading-tight line-clamp-2">
+                        {topCriticalNews.title.length > 80 ? topCriticalNews.title.slice(0, 77) + "…" : topCriticalNews.title}
+                      </p>
+                    )}
+                    {!topCriticalNews && allCategoryNews.length > 0 && (
+                      <p className="text-[9px] text-stone-400">Sin alertas de alto impacto</p>
+                    )}
+                    {topCriticalNews && (
+                      <p className="text-[8px] text-stone-300 mt-1 font-bold tracking-widest">VER ALERTA →</p>
+                    )}
                   </div>
                   <div
                     onClick={() => topCriticalNews && setRiskModalOpen(true)}
@@ -614,13 +642,18 @@ export default function App() {
                   </div>
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Análisis IA</p>
-                    <p className="text-[9px] text-stone-400 mb-2">Reportes generados hoy</p>
-                    <div className="flex items-end justify-between">
+                    <div className="flex items-end justify-between mb-1">
                       <span className="text-2xl font-bold text-stone-900 tracking-tighter">
                         {reports.filter(r => r.location === location).length}
                       </span>
                       <Zap className="text-mre-blue" size={18} />
                     </div>
+                    {analysisSummary && (
+                      <p className="text-[9px] text-stone-500 leading-tight line-clamp-2">{analysisSummary}</p>
+                    )}
+                    {!analysisSummary && (
+                      <p className="text-[9px] text-stone-400">Sin reportes generados</p>
+                    )}
                   </div>
                 </div>
 
