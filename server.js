@@ -925,14 +925,13 @@ app.post("/api/export-word", async (req, res) => {
   if (!location) return res.status(400).json({ error: "location requerido" });
 
   try {
-    // Fetch latest report per category for this location
-    const cats = ["politico", "economico", "cultural", "relaciones_internacionales", "panorama_general"];
+    // Fetch latest report per category for this location (4 categories only)
+    const cats = ["politico", "economico", "cultural", "relaciones_internacionales"];
     const catLabels = {
-      politico: "Político",
-      economico: "Económico",
-      cultural: "Cultural",
-      relaciones_internacionales: "Relaciones Internacionales",
-      panorama_general: "Panorama General",
+      politico: "I. Situación Política",
+      economico: "II. Situación Económica",
+      cultural: "III. Situación Cultural",
+      relaciones_internacionales: "IV. Relaciones Internacionales",
     };
 
     const reportRows = await Promise.all(cats.map(async (cat) => {
@@ -960,19 +959,23 @@ app.post("/api/export-word", async (req, res) => {
     const fileDate = today.toISOString().split("T")[0];
 
     // ── APA 7th edition citation builder ────────────────────────────────────
-    // Format: Apellido, I. (Año, Mes Día). Título del artículo. *Nombre del medio*. URL
+    // APA 7 para artículo de medio de comunicación sin autor individual:
+    // Nombre del medio. (Año, mes día). Título del artículo. https://...
     function apaCitation(news, index) {
-      const pub = news.source || "Fuente desconocida";
-      let dateApa = "";
+      const pub = (news.source || "Fuente desconocida").trim();
+      let year = new Date().getFullYear().toString();
+      let dateApa = "s.f.";
       if (news.date) {
         const d = new Date(news.date);
         if (!isNaN(d)) {
-          dateApa = d.toLocaleDateString("es-PE", { year: "numeric", month: "long", day: "2-digit" });
+          year = d.getFullYear().toString();
+          const mes = d.toLocaleDateString("es-PE", { month: "long" });
+          const dia = d.getDate();
+          dateApa = `${year}, ${mes} ${dia}`;
         }
       }
       const title = (news.title || "Sin título").trim();
       const url = news.url || "";
-      // APA 7 for news org (no individual author): Source. (Date). Title. *Publication*. URL
       return { index: index + 1, pub, dateApa, title, url };
     }
 
@@ -1101,6 +1104,68 @@ app.post("/api/export-word", async (req, res) => {
         }
       }
     }
+
+    // ── Referencias APA 7ma edición ──────────────────────────────────────────
+    if (refs.length > 0) {
+      children.push(
+        new Paragraph({
+          pageBreakBefore: true,
+          heading: HeadingLevel.HEADING_1,
+          children: [new TextRun({ text: "REFERENCIAS", bold: true, size: 28, font: "Arial", color: "1B3A6B" })],
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "1B3A6B", space: 4 } },
+          spacing: { after: 240 },
+        }),
+        new Paragraph({
+          spacing: { after: 120 },
+          children: [new TextRun({ text: "Fuentes de información utilizadas para la elaboración del presente informe (APA 7.ª edición):", size: 18, font: "Arial", color: "555555", italics: true })],
+        }),
+      );
+
+      // Sort refs alphabetically by source name
+      const sortedRefs = [...refs].sort((a, b) => a.pub.localeCompare(b.pub, "es"));
+
+      for (const ref of sortedRefs) {
+        // Format: Nombre del medio. (Año, mes día). Título. https://...
+        const refChildren = [
+          new TextRun({ text: `${ref.pub}. `, bold: true, size: 18, font: "Arial" }),
+          new TextRun({ text: `(${ref.dateApa}). `, size: 18, font: "Arial" }),
+          new TextRun({ text: `${ref.title}. `, size: 18, font: "Arial", italics: true }),
+        ];
+        if (ref.url) {
+          refChildren.push(
+            new ExternalHyperlink({
+              link: ref.url,
+              children: [new TextRun({ text: ref.url, style: "Hyperlink", size: 18, font: "Arial",
+                underline: { type: UnderlineType.SINGLE }, color: "1B3A6B" })],
+            }),
+          );
+        }
+        children.push(
+          new Paragraph({
+            spacing: { after: 120 },
+            indent: { left: 720, hanging: 720 }, // hanging indent APA style
+            children: refChildren,
+          }),
+        );
+      }
+    }
+
+    // ── Nota metodológica ────────────────────────────────────────────────────
+    children.push(
+      new Paragraph({
+        spacing: { before: 480, after: 80 },
+        border: { top: { style: BorderStyle.SINGLE, size: 2, color: "DDDDDD", space: 4 } },
+        children: [new TextRun({ text: "NOTA METODOLÓGICA", bold: true, size: 17, font: "Arial", color: "888888" })],
+      }),
+      new Paragraph({
+        spacing: { after: 60 },
+        children: [new TextRun({ text: `Este informe ha sido elaborado por el sistema de monitoreo geopolítico de la Dirección de Políticas y Estrategias del Ministerio de Relaciones Exteriores del Perú, con base en información pública disponible recopilada de fuentes abiertas y procesada con apoyo de inteligencia artificial (Claude, Anthropic). Los análisis son referenciales y no constituyen posición oficial del MRE.`, size: 17, font: "Arial", color: "888888", italics: true })],
+      }),
+      new Paragraph({
+        spacing: { after: 0 },
+        children: [new TextRun({ text: `Documento generado automáticamente el ${dateStr}.`, size: 17, font: "Arial", color: "AAAAAA" })],
+      }),
+    );
 
     // ── Build document ───────────────────────────────────────────────────────
     const doc = new Document({

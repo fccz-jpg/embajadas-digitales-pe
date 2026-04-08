@@ -1056,31 +1056,127 @@ export default function App() {
                             );
                           })()}
 
-                          {/* News cards — only for the 4 category tabs, not for panorama */}
-                          {activeTab === "panorama_general" && (
-                            <div className="px-6 pb-4 flex items-center justify-between border-b border-stone-100">
-                              <div className="text-[10px] font-bold text-stone-400 tracking-widest">
-                                {activeTabReport ? "INFORME GENERADO — LISTO PARA EXPORTAR" : "SIN INFORME GENERADO AÚN"}
+                          {/* Informe consolidado — sum of all 4 category reports */}
+                          {activeTab === "panorama_general" && (() => {
+                            const CAT_ORDER = ["politico", "economico", "cultural", "relaciones_internacionales"] as const;
+                            const CAT_META = {
+                              politico:                   { label: "I. Situación Política",          color: "text-blue-900",   border: "border-blue-900" },
+                              economico:                  { label: "II. Situación Económica",         color: "text-amber-600",  border: "border-amber-500" },
+                              cultural:                   { label: "III. Situación Cultural",         color: "text-violet-700", border: "border-violet-600" },
+                              relaciones_internacionales: { label: "IV. Relaciones Internacionales",  color: "text-teal-700",   border: "border-teal-600" },
+                            };
+                            const catReports = CAT_ORDER.map(cat => ({
+                              cat,
+                              report: reports.find(r => r.location === location && r.category === cat) ?? null,
+                            }));
+                            const hasAnyReport = catReports.some(cr => cr.report);
+                            const SUBTITLE_RE = /^([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,}[A-ZÁÉÍÓÚÑ]):\s*(.+)/;
+
+                            // Collect all sources across 4 reports for the references list
+                            const allSources: {source: string; title: string; url: string; date?: string}[] = [];
+                            catReports.forEach(({ report }) => {
+                              if (!report) return;
+                              try {
+                                const c = typeof report.content === "string" ? JSON.parse(report.content) : report.content;
+                                if (Array.isArray(c.sources)) allSources.push(...c.sources);
+                              } catch {}
+                            });
+                            const uniqueSources = [...new Map(allSources.filter(s => s.url).map(s => [s.url, s])).values()];
+
+                            return (
+                              <div className="divide-y divide-stone-100">
+                                {/* Action bar */}
+                                <div className="px-6 py-3 flex items-center justify-between bg-red-900/5">
+                                  <div className="text-[10px] font-bold text-stone-400 tracking-widest">
+                                    {hasAnyReport
+                                      ? `${catReports.filter(cr => cr.report).length} DE 4 SECCIONES DISPONIBLES`
+                                      : "SIN REPORTES GENERADOS AÚN"}
+                                  </div>
+                                  <button
+                                    onClick={handleExportWord}
+                                    disabled={isExportingWord || !hasAnyReport}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-full text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                                  >
+                                    {isExportingWord
+                                      ? <><Loader2 size={13} className="animate-spin" /> Generando Word...</>
+                                      : <><Download size={13} /> Descargar Informe Word (.docx)</>
+                                    }
+                                  </button>
+                                </div>
+
+                                {!hasAnyReport ? (
+                                  <div className="p-12 text-center text-stone-400 space-y-3">
+                                    <FileText size={28} className="mx-auto opacity-20" />
+                                    <p className="text-sm font-medium">El informe consolida los 4 reportes temáticos del día.</p>
+                                    <p className="text-[11px]">Presiona "Actualizar monitor" para generarlos.</p>
+                                  </div>
+                                ) : (
+                                  <div className="px-6 py-5 space-y-8">
+                                    {catReports.map(({ cat, report }) => {
+                                      const meta = CAT_META[cat];
+                                      if (!report) return (
+                                        <div key={cat} className="opacity-40 text-[11px] text-stone-400 italic">
+                                          {meta.label} — sin reporte generado
+                                        </div>
+                                      );
+                                      const text = getReportText(report, cat as typeof CAT_ORDER[number]).trim();
+                                      const lines = text.split('\n').filter(l => l.trim());
+                                      const mainTitleMatch = lines[0]?.match(/^#+\s+(.+)/);
+                                      const bodyLines = mainTitleMatch ? lines.slice(1) : lines;
+                                      const blocks = bodyLines.reduce<{title: string; text: string}[]>((acc, line) => {
+                                        const clean = line.trim().replace(/^#+\s*/, '');
+                                        const m = clean.match(SUBTITLE_RE);
+                                        if (m) { acc.push({ title: m[1], text: m[2] }); }
+                                        else if (acc.length > 0) { acc[acc.length - 1].text += ' ' + clean; }
+                                        else if (clean) { acc.push({ title: '', text: clean }); }
+                                        return acc;
+                                      }, []);
+
+                                      return (
+                                        <div key={cat} className={`border-l-4 pl-4 ${meta.border}`}>
+                                          <p className={`text-[11px] font-black tracking-widest uppercase mb-3 ${meta.color}`}>{meta.label}</p>
+                                          <div className="space-y-3">
+                                            {blocks.map((block, i) => (
+                                              <div key={i}>
+                                                {block.title && (
+                                                  <p className="text-[9px] font-black tracking-[0.15em] text-red-700 mb-0.5">{block.title}</p>
+                                                )}
+                                                <p className="text-[13px] leading-relaxed text-stone-800">{block.text}</p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+
+                                    {/* References / Fuentes */}
+                                    {uniqueSources.length > 0 && (
+                                      <div className="border-t border-stone-200 pt-5 space-y-2">
+                                        <p className="text-[10px] font-black tracking-widest text-stone-400 uppercase">Referencias (APA 7.ª ed.)</p>
+                                        <div className="space-y-1.5">
+                                          {[...uniqueSources].sort((a,b) => (a.source||"").localeCompare(b.source||"","es")).map((s, i) => {
+                                            let dateApa = "s.f.";
+                                            if (s.date) {
+                                              const d = new Date(s.date);
+                                              if (!isNaN(d.getTime())) {
+                                                dateApa = `${d.getFullYear()}, ${d.toLocaleDateString("es-PE",{month:"long"})} ${d.getDate()}`;
+                                              }
+                                            }
+                                            return (
+                                              <p key={i} className="text-[11px] text-stone-500 leading-snug pl-5 -indent-5">
+                                                <span className="font-semibold">{s.source}.</span> ({dateApa}). <em>{s.title}.</em>{" "}
+                                                {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-mre-blue hover:underline break-all">{s.url}</a>}
+                                              </p>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              <button
-                                onClick={handleExportWord}
-                                disabled={isExportingWord || !activeTabReport}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-full text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-                              >
-                                {isExportingWord
-                                  ? <><Loader2 size={13} className="animate-spin" /> Generando Word...</>
-                                  : <><Download size={13} /> Descargar Informe Word (.docx)</>
-                                }
-                              </button>
-                            </div>
-                          )}
-                          {activeTab === "panorama_general" && !activeTabReport && (
-                            <div className="p-12 text-center text-stone-400 space-y-3">
-                              <FileText size={28} className="mx-auto opacity-20" />
-                              <p className="text-sm font-medium">El informe diario se genera automáticamente cada mañana.</p>
-                              <p className="text-[11px]">Presiona "Actualizar monitor" para generar ahora.</p>
-                            </div>
-                          )}
+                            );
+                          })()}
                           <div className={cn("p-6", activeTab === "panorama_general" && "hidden")}>
                             {isLoadingNews ? (
                               <div className="flex items-center justify-center py-16 gap-3 text-stone-400">
