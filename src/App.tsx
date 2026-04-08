@@ -676,13 +676,26 @@ export default function App() {
         )}
 
         {activeView === "home" ? (
-          <div className="p-8 h-full flex flex-col">
+          <div className="p-8 h-full flex flex-col gap-5">
+            {/* Disclaimer banner */}
+            <div className="bg-white border border-blue-100 rounded-2xl px-6 py-4 shadow-sm flex flex-col md:flex-row md:items-center gap-3">
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="w-9 h-9 bg-mre-blue/10 rounded-xl flex items-center justify-center shrink-0">
+                  <Zap size={16} className="text-mre-blue" />
+                </div>
+                <span className="text-[9px] font-black tracking-widest text-mre-blue uppercase">Fase de prueba</span>
+              </div>
+              <div className="h-px md:h-6 md:w-px bg-stone-100 shrink-0" />
+              <p className="text-[11px] text-stone-500 leading-relaxed">
+                Esta plataforma es una <span className="font-bold text-stone-700">iniciativa de la Dirección de Políticas y Estrategias del Ministerio de Relaciones Exteriores del Perú</span>, actualmente en proceso de perfeccionamiento. Permite el monitoreo geopolítico en tiempo real de las sedes diplomáticas peruanas en el exterior, basándose en <span className="font-semibold text-stone-600">información pública disponible</span> y apoyándose en el uso de <span className="font-semibold text-stone-600">inteligencia artificial</span> para la síntesis y análisis de contenidos. Los reportes generados son referenciales y no constituyen posición oficial del MRE.
+              </p>
+            </div>
             <div className="flex-1">
-              <WorldMapView 
+              <WorldMapView
                 onLocationSelect={(loc) => {
                   setLocation(loc);
                   setActiveView("dashboard");
-                }} 
+                }}
               />
             </div>
           </div>
