@@ -96,6 +96,126 @@ import WorldMapView from "./components/WorldMapView";
 
 type View = "home" | "dashboard" | "monitoring" | "reports";
 
+// ── Fichas oficiales de países monitoreados ───────────────────────────────
+const COUNTRY_PROFILES: Record<string, {
+  flag: string; officialName: string; capital: string;
+  area: string; population: string; headOfState: string; title: string;
+  currency: string; language: string; source: string;
+}> = {
+  "Ciudad de México": {
+    flag: "🇲🇽", officialName: "Estados Unidos Mexicanos",
+    capital: "Ciudad de México", area: "1,964,375 km²",
+    population: "130.7 millones (INEGI, 2024)",
+    title: "Presidenta", headOfState: "Claudia Sheinbaum Pardo",
+    currency: "Peso mexicano (MXN)", language: "Español",
+    source: "INEGI / Presidencia de México"
+  },
+  "San Marino": {
+    flag: "🇸🇲", officialName: "República de San Marino",
+    capital: "Ciudad de San Marino", area: "61.2 km²",
+    population: "34,232 (Oficina de Estadística, 2024)",
+    title: "Capitanes Regentes", headOfState: "Sistema bicéfalo rotativo (6 meses)",
+    currency: "Euro (EUR)", language: "Italiano",
+    source: "Oficina de Estadística de San Marino"
+  },
+  "Timbu": {
+    flag: "🇧🇹", officialName: "Reino de Bután",
+    capital: "Timbu", area: "38,394 km²",
+    population: "787,941 (NSB Bután, 2024)",
+    title: "Rey", headOfState: "Jigme Khesar Namgyel Wangchuck",
+    currency: "Ngultrum (BTN)", language: "Dzongkha",
+    source: "National Statistics Bureau of Bhutan"
+  },
+  "Belmopán": {
+    flag: "🇧🇿", officialName: "Belice",
+    capital: "Belmopán", area: "22,966 km²",
+    population: "441,471 (SIB Belize, 2024)",
+    title: "Primer Ministro", headOfState: "John Briceño",
+    currency: "Dólar de Belice (BZD)", language: "Inglés",
+    source: "Statistical Institute of Belize"
+  },
+  "Puerto Príncipe": {
+    flag: "🇭🇹", officialName: "República de Haití",
+    capital: "Puerto Príncipe", area: "27,750 km²",
+    population: "11.77 millones (IHSI, 2024)",
+    title: "Primer Ministro", headOfState: "Alix Didier Fils-Aimé",
+    currency: "Gourde haitiana (HTG)", language: "Criollo haitiano · Francés",
+    source: "Institut Haïtien de Statistique et d'Informatique"
+  },
+  "Nasáu": {
+    flag: "🇧🇸", officialName: "Commonwealth de las Bahamas",
+    capital: "Nasáu", area: "13,943 km²",
+    population: "409,984 (Dept. of Statistics Bahamas, 2024)",
+    title: "Primer Ministro", headOfState: "Philip Davis",
+    currency: "Dólar bahameño (BSD)", language: "Inglés",
+    source: "Department of Statistics – The Bahamas"
+  },
+  "Paramaribo": {
+    flag: "🇸🇷", officialName: "República de Surinam",
+    capital: "Paramaribo", area: "163,820 km²",
+    population: "632,638 (ABS Suriname, 2024)",
+    title: "Presidente", headOfState: "Chan Santokhi",
+    currency: "Dólar surinamés (SRD)", language: "Neerlandés",
+    source: "Algemeen Bureau voor de Statistiek – Suriname"
+  },
+  "Saint John's": {
+    flag: "🇦🇬", officialName: "Antigua y Barbuda",
+    capital: "Saint John's", area: "442 km²",
+    population: "100,335 (Statistics Division, 2024)",
+    title: "Primer Ministro", headOfState: "Gaston Browne",
+    currency: "Dólar del Caribe Oriental (XCD)", language: "Inglés",
+    source: "Statistics Division of Antigua and Barbuda"
+  },
+  "Bridgetown": {
+    flag: "🇧🇧", officialName: "Barbados",
+    capital: "Bridgetown", area: "430 km²",
+    population: "281,995 (Barbados Statistical Service, 2024)",
+    title: "Primera Ministra", headOfState: "Mia Mottley",
+    currency: "Dólar de Barbados (BBD)", language: "Inglés",
+    source: "Barbados Statistical Service"
+  },
+  "Roseau": {
+    flag: "🇩🇲", officialName: "Mancomunidad de Dominica",
+    capital: "Roseau", area: "751 km²",
+    population: "72,737 (CSO Dominica, 2024)",
+    title: "Primer Ministro", headOfState: "Roosevelt Skerrit",
+    currency: "Dólar del Caribe Oriental (XCD)", language: "Inglés",
+    source: "Central Statistics Office of Dominica"
+  },
+  "Saint George's": {
+    flag: "🇬🇩", officialName: "Granada",
+    capital: "Saint George's", area: "344 km²",
+    population: "125,438 (CSO Grenada, 2024)",
+    title: "Primer Ministro", headOfState: "Dickon Mitchell",
+    currency: "Dólar del Caribe Oriental (XCD)", language: "Inglés",
+    source: "Central Statistics Office of Grenada"
+  },
+  "Basseterre": {
+    flag: "🇰🇳", officialName: "San Cristóbal y Nieves",
+    capital: "Basseterre", area: "261 km²",
+    population: "53,821 (Statistics Dept. SKN, 2024)",
+    title: "Primer Ministro", headOfState: "Terrance Drew",
+    currency: "Dólar del Caribe Oriental (XCD)", language: "Inglés",
+    source: "Statistics Department of St. Kitts and Nevis"
+  },
+  "Castries": {
+    flag: "🇱🇨", officialName: "Santa Lucía",
+    capital: "Castries", area: "616 km²",
+    population: "179,667 (CSO Saint Lucia, 2024)",
+    title: "Primer Ministro", headOfState: "Philip Pierre",
+    currency: "Dólar del Caribe Oriental (XCD)", language: "Inglés",
+    source: "Central Statistics Office of Saint Lucia"
+  },
+  "Kingstown": {
+    flag: "🇻🇨", officialName: "San Vicente y las Granadinas",
+    capital: "Kingstown", area: "389 km²",
+    population: "103,698 (Statistics SVG, 2024)",
+    title: "Primer Ministro", headOfState: "Ralph Gonsalves",
+    currency: "Dólar del Caribe Oriental (XCD)", language: "Inglés",
+    source: "Statistical Office of Saint Vincent and the Grenadines"
+  },
+};
+
 export default function App() {
   const [activeView, setActiveView] = useState<View>("home");
   const [reports, setReports] = useState<Report[]>([]);
@@ -999,24 +1119,48 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* Relaciones Internacionales Block */}
-                  <section className="space-y-4">
-                    <h3 className="text-[11px] font-bold text-stone-400 tracking-[0.2em] flex items-center gap-2">
-                      <Globe size={14} />
-                      RR. Internacionales
-                    </h3>
-                    <div className="bg-white border border-stone-100 rounded-2xl p-6 shadow-lg">
-                      {latestReportForLocation && typeof latestReportForLocation.content !== 'string' ? (
-                        <div className="markdown-body text-xs leading-relaxed">
-                          <ReactMarkdown>
-                            {latestReportForLocation.content.relaciones_internacionales}
-                          </ReactMarkdown>
+                  {/* Ficha del País */}
+                  {(() => {
+                    const profile = COUNTRY_PROFILES[location];
+                    if (!profile) return null;
+                    return (
+                      <section className="space-y-4">
+                        <h3 className="text-[11px] font-bold text-stone-400 tracking-[0.2em] flex items-center gap-2">
+                          <Globe size={14} />
+                          Ficha del País
+                        </h3>
+                        <div className="bg-white border border-stone-100 rounded-2xl p-5 shadow-lg space-y-4">
+                          {/* Header */}
+                          <div className="flex items-center gap-3 pb-3 border-b border-stone-100">
+                            <span className="text-4xl leading-none">{profile.flag}</span>
+                            <div>
+                              <p className="text-[10px] font-black text-stone-800 tracking-wide leading-tight">{profile.officialName}</p>
+                              <p className="text-[9px] text-stone-400 mt-0.5">Capital: {profile.capital}</p>
+                            </div>
+                          </div>
+                          {/* Data grid */}
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                            {[
+                              { label: "Superficie", value: profile.area },
+                              { label: "Población", value: profile.population },
+                              { label: profile.title, value: profile.headOfState },
+                              { label: "Moneda", value: profile.currency },
+                              { label: "Idioma oficial", value: profile.language },
+                            ].map(({ label, value }) => (
+                              <div key={label}>
+                                <p className="text-[8px] font-bold text-stone-400 tracking-widest uppercase mb-0.5">{label}</p>
+                                <p className="text-[10px] font-semibold text-stone-700 leading-snug">{value}</p>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Source */}
+                          <p className="text-[8px] text-stone-300 tracking-wide border-t border-stone-50 pt-2">
+                            Fuente oficial: {profile.source}
+                          </p>
                         </div>
-                      ) : (
-                        <p className="text-stone-400 text-xs italic">Sincronice para obtener análisis diplomático.</p>
-                      )}
-                    </div>
-                  </section>
+                      </section>
+                    );
+                  })()}
 
                   {/* Local Map */}
                   <section className="space-y-4">
