@@ -839,13 +839,20 @@ export default function App() {
                             const sources: { title: string; source: string; url: string }[] =
                               (() => { try { const c = typeof activeTabReport.content === "string" ? JSON.parse(activeTabReport.content) : activeTabReport.content; return Array.isArray(c.sources) ? c.sources : []; } catch { return []; } })();
 
+                            // Extract optional markdown main title (# Título)
+                            const allLines = reportText.split('\n').filter(l => l.trim());
+                            const mainTitleMatch = allLines[0]?.match(/^#+\s+(.+)/);
+                            const mainTitle = mainTitleMatch ? mainTitleMatch[1].trim() : null;
+                            const bodyLines = mainTitle ? allLines.slice(1) : allLines;
+
                             // Parse "SUBTÍTULO: texto" lines
                             const SUBTITLE_RE = /^([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,}[A-ZÁÉÍÓÚÑ]):\s*(.+)/;
-                            const blocks = reportText.split('\n').filter(l => l.trim()).reduce<{title: string; text: string}[]>((acc, line) => {
-                              const m = line.trim().match(SUBTITLE_RE);
+                            const blocks = bodyLines.reduce<{title: string; text: string}[]>((acc, line) => {
+                              const clean = line.trim().replace(/^#+\s*/, '');
+                              const m = clean.match(SUBTITLE_RE);
                               if (m) { acc.push({ title: m[1], text: m[2] }); }
-                              else if (acc.length > 0) { acc[acc.length - 1].text += ' ' + line.trim(); }
-                              else { acc.push({ title: '', text: line.trim() }); }
+                              else if (acc.length > 0) { acc[acc.length - 1].text += ' ' + clean; }
+                              else if (clean) { acc.push({ title: '', text: clean }); }
                               return acc;
                             }, []);
 
@@ -859,6 +866,10 @@ export default function App() {
                                   <span className="text-[8px] text-stone-300 font-bold tracking-widest">GENERADO POR CLAUDE</span>
                                 </div>
                                 <div className="px-6 pb-5 space-y-3">
+                                  {/* Main title (from markdown # heading) */}
+                                  {mainTitle && (
+                                    <p className="text-[11px] font-black tracking-wide text-stone-800 uppercase leading-snug">{mainTitle}</p>
+                                  )}
                                   {/* Subtitle blocks */}
                                   <div className="bg-stone-50 border border-stone-100 rounded-xl overflow-hidden divide-y divide-stone-100">
                                     {blocks.map((block, i) => (
