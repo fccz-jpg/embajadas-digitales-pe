@@ -85,14 +85,7 @@ export const mockCountryData: Record<string, { capital: string, population: stri
     language: "Dzongkha",
     gdp: "2.53 mil millones USD"
   },
-  "Madrid": {
-    capital: "Madrid",
-    population: "47.4 millones",
-    currency: "Euro (EUR)",
-    language: "Español",
-    gdp: "1.58 billones USD"
-  },
-  "Saint John's": { capital: "Saint John's", population: "97,928", currency: "Dólar del Caribe Oriental (XCD)", language: "Inglés", gdp: "1.73 mil millones USD" },
+"Saint John's": { capital: "Saint John's", population: "97,928", currency: "Dólar del Caribe Oriental (XCD)", language: "Inglés", gdp: "1.73 mil millones USD" },
   "Nasáu": { capital: "Nasáu", population: "393,244", currency: "Dólar bahameño (BSD)", language: "Inglés", gdp: "13.6 mil millones USD" },
   "Bridgetown": { capital: "Bridgetown", population: "287,025", currency: "Dólar de Barbados (BBD)", language: "Inglés", gdp: "5.64 mil millones USD" },
   "Belmopán": { capital: "Belmopán", population: "441,471", currency: "Dólar de Belice (BZD)", language: "Inglés / Español", gdp: "2.79 mil millones USD" },
@@ -128,16 +121,6 @@ export const mockMediaSources: MediaSource[] = [
   { id: "bt2", name: "Bhutan Times", country: "Bután", location: "Timbu", type: "Diario", url: "https://bhutantimes.bt", status: "Activo", lastCheck: new Date().toISOString() },
   { id: "bt3", name: "BBS (Bhutan Broadcasting)", country: "Bután", location: "Timbu", type: "TV", url: "https://www.bbs.bt", status: "Activo", lastCheck: new Date().toISOString() },
   { id: "bt4", name: "The Bhutanese", country: "Bután", location: "Timbu", type: "Diario", url: "https://thebhutanese.bt", status: "Activo", lastCheck: new Date().toISOString() },
-
-  // España
-  { id: "es1", name: "El País", country: "España", location: "Madrid", type: "Diario", url: "https://elpais.com", status: "Activo", lastCheck: new Date().toISOString() },
-  { id: "es2", name: "El Mundo", country: "España", location: "Madrid", type: "Diario", url: "https://www.elmundo.es", status: "Activo", lastCheck: new Date().toISOString() },
-  { id: "es3", name: "La Vanguardia", country: "España", location: "Madrid", type: "Diario", url: "https://www.lavanguardia.com", status: "Activo", lastCheck: new Date().toISOString() },
-  { id: "es4", name: "ABC", country: "España", location: "Madrid", type: "Diario", url: "https://www.abc.es", status: "Activo", lastCheck: new Date().toISOString() },
-  { id: "es5", name: "Expansión España", country: "España", location: "Madrid", type: "Diario", url: "https://www.expansion.com", status: "Activo", lastCheck: new Date().toISOString() },
-  { id: "es6", name: "RTVE", country: "España", location: "Madrid", type: "TV", url: "https://www.rtve.es", status: "Activo", lastCheck: new Date().toISOString() },
-  { id: "es7", name: "Cadena SER", country: "España", location: "Madrid", type: "Radio", url: "https://cadenaser.com", status: "Activo", lastCheck: new Date().toISOString() },
-  { id: "es8", name: "El Confidencial", country: "España", location: "Madrid", type: "Digital", url: "https://www.elconfidencial.com", status: "Activo", lastCheck: new Date().toISOString() },
 
   // Antigua y Barbuda
   { id: "ag1", name: "Antigua Observer", country: "Antigua y Barbuda", location: "Saint John's", type: "Digital", url: "https://antiguaobserver.com", status: "Activo", lastCheck: new Date().toISOString() },
