@@ -555,22 +555,57 @@ export default function App() {
                 Actualizar monitor
               </button>
 
-              <div className="space-y-1.5">
+              {/* Country list grouped by region */}
+              <div className="space-y-3">
                 <label className="text-[10px] font-bold text-stone-400 tracking-widest flex items-center gap-2">
                   <Globe size={12} />
                   País en seguimiento
                 </label>
-                <select
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-md px-3 py-2 text-sm font-medium text-stone-700 focus:outline-none focus:ring-2 focus:ring-mre-blue/20 focus:border-mre-blue transition-all"
-                >
-                  {EMBASSIES.map((emb) => (
-                    <option key={emb.id} value={emb.name}>
-                      {emb.name}, {emb.country}
-                    </option>
-                  ))}
-                </select>
+                {[
+                  {
+                    region: "AMÉRICA",
+                    ids: ["mexico","antigua","bahamas","barbados","belize","grenada","haiti","stkitts","stlucia","stvincent","suriname"],
+                  },
+                  {
+                    region: "EUROPA",
+                    ids: ["sanmarino"],
+                  },
+                  {
+                    region: "ASIA",
+                    ids: ["bhutan"],
+                  },
+                ].map(({ region, ids }) => {
+                  const list = EMBASSIES.filter(e => ids.includes(e.id));
+                  return (
+                    <div key={region}>
+                      <p className="text-[8px] font-black tracking-[0.2em] text-stone-300 mb-1.5 px-1">{region}</p>
+                      <div className="space-y-0.5">
+                        {list.map((emb) => {
+                          const profile = COUNTRY_PROFILES[emb.name];
+                          const isActive = location === emb.name;
+                          return (
+                            <button
+                              key={emb.id}
+                              onClick={() => setLocation(emb.name)}
+                              className={cn(
+                                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all",
+                                isActive
+                                  ? "bg-mre-blue text-white shadow-sm"
+                                  : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+                              )}
+                            >
+                              <span className="text-base leading-none shrink-0">{profile?.flag ?? "🌐"}</span>
+                              <div className="min-w-0">
+                                <p className={cn("text-[10px] font-bold leading-tight truncate", isActive ? "text-white" : "text-stone-700")}>{emb.country}</p>
+                                <p className={cn("text-[9px] leading-tight truncate", isActive ? "text-blue-200" : "text-stone-400")}>{emb.name}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
