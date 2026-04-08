@@ -116,6 +116,7 @@ export default function App() {
   const [liveNews, setLiveNews] = useState<NewsItem[]>([]);
   const [isLoadingNews, setIsLoadingNews] = useState(false);
   const [isExportingWord, setIsExportingWord] = useState(false);
+  const [riskModalOpen, setRiskModalOpen] = useState(false);
 
   // Fetch live RSS news whenever location or active tab changes
   useEffect(() => {
@@ -591,7 +592,9 @@ export default function App() {
                       <AlertTriangle className="text-amber-500" size={18} />
                     </div>
                   </div>
-                  <div className={`border p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow ${riskLevel === "Alto" ? "bg-red-50 border-red-100" : riskLevel === "Medio" ? "bg-amber-50 border-amber-100" : "bg-white border-stone-100"}`}>
+                  <div
+                    onClick={() => topCriticalNews && setRiskModalOpen(true)}
+                    className={`border p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow ${topCriticalNews ? "cursor-pointer" : ""} ${riskLevel === "Alto" ? "bg-red-50 border-red-100" : riskLevel === "Medio" ? "bg-amber-50 border-amber-100" : "bg-white border-stone-100"}`}>
                     <p className="text-[9px] font-bold text-stone-400 tracking-widest mb-1">Nivel de riesgo</p>
                     <div className="flex items-end justify-between mb-1">
                       <span className={`text-2xl font-bold tracking-tighter ${allCategoryNews.length > 0 ? riskColor : "text-stone-400"}`}>
@@ -604,6 +607,9 @@ export default function App() {
                     )}
                     {!riskReason && allCategoryNews.length > 0 && (
                       <p className="text-[9px] text-stone-400">Sin alertas críticas detectadas</p>
+                    )}
+                    {topCriticalNews && (
+                      <p className="text-[8px] text-stone-300 mt-1 font-bold tracking-widest">VER NOTICIA →</p>
                     )}
                   </div>
                   <div className="bg-white border border-stone-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
@@ -1347,6 +1353,38 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Risk Alert Modal */}
+      {riskModalOpen && topCriticalNews && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setRiskModalOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} className="text-red-500 shrink-0" />
+                <p className="text-[9px] font-black tracking-widest text-red-500">ALERTA CRÍTICA — NOTICIA PRINCIPAL</p>
+              </div>
+              <button onClick={() => setRiskModalOpen(false)} className="text-stone-300 hover:text-stone-600 text-lg font-bold leading-none">✕</button>
+            </div>
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-stone-400 tracking-widest">{topCriticalNews.source?.toUpperCase()}</p>
+              <h3 className="text-base font-bold text-stone-900 leading-snug">{topCriticalNews.title}</h3>
+              {topCriticalNews.preview && topCriticalNews.preview !== topCriticalNews.title && (
+                <p className="text-sm text-stone-600 leading-relaxed">{topCriticalNews.preview}</p>
+              )}
+              <p className="text-[10px] text-stone-400">
+                {topCriticalNews.date ? format(new Date(topCriticalNews.date), "dd MMM yyyy · HH:mm", { locale: es }) : ""}
+              </p>
+            </div>
+            {topCriticalNews.url && (
+              <a href={topCriticalNews.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm font-bold text-mre-blue hover:underline">
+                <ExternalLink size={13} />
+                Leer noticia completa
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
