@@ -545,7 +545,8 @@ export default function App() {
               </nav>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-stone-200 scrollbar-track-transparent">
+            {/* Single scrollable area — button fixed, list scrollable */}
+            <div className="shrink-0 px-4 pt-4">
               <button
                 onClick={handleUpdateMonitoring}
                 disabled={isGenerating}
@@ -554,7 +555,9 @@ export default function App() {
                 {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                 Actualizar monitor
               </button>
+            </div>
 
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-3 space-y-4 scrollbar-thin scrollbar-thumb-stone-200 scrollbar-track-transparent">
               {/* Country list grouped by region */}
               <div className="space-y-3">
                 <label className="text-[10px] font-bold text-stone-400 tracking-widest flex items-center gap-2">
@@ -607,14 +610,13 @@ export default function App() {
                   );
                 })}
               </div>
-            </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-2">
+              {/* Reports history — shown only in reports view */}
               {activeView === "reports" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="space-y-2 border-t border-stone-100 pt-4">
+                  <div className="flex items-center justify-between">
                     <h3 className="text-[10px] font-bold text-stone-400 tracking-widest">Historial</h3>
-                    <button 
+                    <button
                       onClick={() => setSelectedReport(null)}
                       className="text-[10px] font-bold text-mre-blue tracking-widest hover:underline"
                     >
