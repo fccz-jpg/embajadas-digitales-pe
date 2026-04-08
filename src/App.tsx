@@ -487,7 +487,7 @@ export default function App() {
           !isSidebarOpen && "w-0 border-r-0"
         )}>
           <div className={cn(
-            "flex flex-col h-full w-80 transition-opacity duration-200",
+            "flex flex-col h-full min-h-0 w-80 transition-opacity duration-200",
             !isSidebarOpen ? "opacity-0 pointer-events-none" : "opacity-100"
           )}>
             <div className="p-6 border-b border-stone-100">
