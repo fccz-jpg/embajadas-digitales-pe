@@ -722,7 +722,7 @@ export default function App() {
               </div>
               <div className="h-px md:h-6 md:w-px bg-stone-100 shrink-0" />
               <p className="text-[11px] text-stone-500 leading-relaxed">
-                Esta plataforma es una <span className="font-bold text-stone-700">iniciativa de la Dirección de Políticas y Estrategias del Ministerio de Relaciones Exteriores del Perú</span>, actualmente en proceso de perfeccionamiento. Permite el monitoreo geopolítico en tiempo real de las sedes diplomáticas peruanas en el exterior, basándose en <span className="font-semibold text-stone-600">información pública disponible</span> y apoyándose en el uso de <span className="font-semibold text-stone-600">inteligencia artificial</span> para la síntesis y análisis de contenidos. Los reportes generados son referenciales y no constituyen posición oficial del MRE.
+                Esta plataforma es una <span className="font-bold text-stone-700">iniciativa de la Dirección de Políticas y Estrategias del Ministerio de Relaciones Exteriores del Perú</span>, actualmente en proceso de perfeccionamiento. Permite el monitoreo geopolítico en tiempo real, basándose en <span className="font-semibold text-stone-600">información pública disponible</span> y apoyándose en el uso de <span className="font-semibold text-stone-600">inteligencia artificial</span> para la síntesis y análisis de contenidos. Los reportes generados son referenciales y no constituyen posición oficial del MRE.
               </p>
             </div>
             <div className="flex-1">
