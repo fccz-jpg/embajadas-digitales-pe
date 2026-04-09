@@ -112,6 +112,8 @@ const LOCATION_FEEDS = {
       { url: "https://sanmarinonews.net/feed/", name: "San Marino News" },
       { url: "https://www.ansa.it/sito/ansait_rss.xml", name: "ANSA" },
       { url: "https://xml2.corrieredellasera.it/rss/homepage.xml", name: "Corriere della Sera" },
+      { url: "https://www.tgcom24.mediaset.it/rss/homepage.xml", name: "TGCom24" },
+      { url: "https://www.ilmessaggero.it/rss/home.xml", name: "Il Messaggero" },
     ],
     economico: [
       { url: "https://www.sanmarinortv.sm/rss/news.rss", name: "San Marino RTV" },
@@ -119,6 +121,8 @@ const LOCATION_FEEDS = {
       { url: "https://www.ilsole24ore.com/rss/italia.xml", name: "Il Sole 24 Ore" },
       { url: "https://www.ansa.it/sito/ansait_rss.xml", name: "ANSA" },
       { url: "https://sanmarinonews.net/feed/", name: "San Marino News" },
+      { url: "https://www.milanofinanza.it/rss/home", name: "Milano Finanza" },
+      { url: "https://xml2.corrieredellasera.it/rss/homepage.xml", name: "Corriere della Sera" },
     ],
     cultural: [
       { url: "https://www.sanmarinortv.sm/rss/news.rss", name: "San Marino RTV" },
@@ -126,6 +130,7 @@ const LOCATION_FEEDS = {
       { url: "https://sanmarinonews.net/feed/", name: "San Marino News" },
       { url: "https://www.repubblica.it/rss/homepage/rss2.0.xml", name: "La Repubblica" },
       { url: "https://xml2.corrieredellasera.it/rss/homepage.xml", name: "Corriere della Sera" },
+      { url: "https://www.libertas.sm/feed/", name: "Libertas" },
     ],
     relaciones_internacionales: [
       { url: "https://www.sanmarinortv.sm/rss/news.rss", name: "San Marino RTV" },
@@ -134,6 +139,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.repubblica.it/rss/homepage/rss2.0.xml", name: "La Repubblica" },
       { url: "https://xml2.corrieredellasera.it/rss/homepage.xml", name: "Corriere della Sera" },
       { url: "https://www.ilsole24ore.com/rss/italia.xml", name: "Il Sole 24 Ore" },
+      { url: "https://sanmarinonews.net/feed/", name: "San Marino News" },
     ],
   },
   "Timbu": {
@@ -142,21 +148,26 @@ const LOCATION_FEEDS = {
       { url: "https://www.bhutantimes.bt/feed/", name: "Bhutan Times" },
       { url: "https://thebhutanese.bt/feed/", name: "The Bhutanese" },
       { url: "https://www.bhutanobserver.bt/feed/", name: "Bhutan Observer" },
+      { url: "https://drukjournal.bt/feed/", name: "Druk Journal" },
       { url: "https://www.thehindu.com/feeder/default.rss", name: "The Hindu" },
       { url: "https://southasianmonitor.com/feed/", name: "South Asian Monitor" },
+      { url: "https://timesofindia.indiatimes.com/rssfeeds/1221656.cms", name: "Times of India" },
     ],
     economico: [
       { url: "https://kuenselonline.com/feed/", name: "Kuensel Online" },
       { url: "https://www.bhutantimes.bt/feed/", name: "Bhutan Times" },
       { url: "https://businessbhutan.bt/feed/", name: "Business Bhutan" },
+      { url: "https://thebhutanese.bt/feed/", name: "The Bhutanese" },
       { url: "https://timesofindia.indiatimes.com/rssfeeds/1221656.cms", name: "Times of India" },
       { url: "https://southasianmonitor.com/feed/", name: "South Asian Monitor" },
+      { url: "https://www.thehindu.com/feeder/default.rss", name: "The Hindu" },
     ],
     cultural: [
       { url: "https://kuenselonline.com/feed/", name: "Kuensel Online" },
       { url: "https://thebhutanese.bt/feed/", name: "The Bhutanese" },
       { url: "https://drukjournal.bt/feed/", name: "Druk Journal" },
       { url: "https://www.bhutanobserver.bt/feed/", name: "Bhutan Observer" },
+      { url: "https://businessbhutan.bt/feed/", name: "Business Bhutan" },
       { url: "https://www.thehindu.com/feeder/default.rss", name: "The Hindu" },
     ],
     relaciones_internacionales: [
@@ -166,6 +177,7 @@ const LOCATION_FEEDS = {
       { url: "https://southasianmonitor.com/feed/", name: "South Asian Monitor" },
       { url: "https://www.thehindu.com/feeder/default.rss", name: "The Hindu" },
       { url: "https://timesofindia.indiatimes.com/rssfeeds/1221656.cms", name: "Times of India" },
+      { url: "https://drukjournal.bt/feed/", name: "Druk Journal" },
     ],
   },
   "Saint John's": {
@@ -175,6 +187,8 @@ const LOCATION_FEEDS = {
       { url: "https://268today.com/feed/", name: "268Today" },
       { url: "https://caribarena.com/antigua/feed/", name: "Caribarena Antigua" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://caribbeanmediagroup.com/feed/", name: "CMC Caribbean" },
     ],
     economico: [
       { url: "https://antiguaobserver.com/feed/", name: "Antigua Observer" },
@@ -182,19 +196,22 @@ const LOCATION_FEEDS = {
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://caribbeanmediagroup.com/feed/", name: "CMC Caribbean" },
       { url: "https://antiguanewsroom.com/feed/", name: "Antigua Newsroom" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://antiguaobserver.com/feed/", name: "Antigua Observer" },
       { url: "https://268today.com/feed/", name: "268Today" },
       { url: "https://caribarena.com/antigua/feed/", name: "Caribarena Antigua" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     relaciones_internacionales: [
       { url: "https://antiguaobserver.com/feed/", name: "Antigua Observer" },
       { url: "https://antiguanewsroom.com/feed/", name: "Antigua Newsroom" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://caribbeanmediagroup.com/feed/", name: "CMC Caribbean" },
-      { url: "https://loop.antiguaobserver.com/feed/", name: "Loop Antigua" },
+      { url: "https://268today.com/feed/", name: "268Today" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
   },
   "Nasáu": {
@@ -204,6 +221,8 @@ const LOCATION_FEEDS = {
       { url: "https://ewnews.com/feed/", name: "Eyewitness News Bahamas" },
       { url: "https://bahamaspress.com/feed/", name: "Bahamas Press" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://loopnewsbahamas.com/feed/", name: "Loop Bahamas" },
     ],
     economico: [
       { url: "https://thenassauguardian.com/feed/", name: "Nassau Guardian" },
@@ -211,12 +230,14 @@ const LOCATION_FEEDS = {
       { url: "https://ewnews.com/feed/", name: "Eyewitness News Bahamas" },
       { url: "https://loopnewsbahamas.com/feed/", name: "Loop Bahamas" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://thenassauguardian.com/feed/", name: "Nassau Guardian" },
       { url: "https://www.tribune242.com/rss/headlines.rss", name: "Tribune242" },
       { url: "https://loopnewsbahamas.com/feed/", name: "Loop Bahamas" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     relaciones_internacionales: [
       { url: "https://thenassauguardian.com/feed/", name: "Nassau Guardian" },
@@ -224,6 +245,7 @@ const LOCATION_FEEDS = {
       { url: "https://bahamaspress.com/feed/", name: "Bahamas Press" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://ewnews.com/feed/", name: "Eyewitness News Bahamas" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
   },
   "Bridgetown": {
@@ -233,6 +255,8 @@ const LOCATION_FEEDS = {
       { url: "https://www.barbadosadvocate.com/feed/", name: "Barbados Advocate" },
       { url: "https://www.loopnewsbarbados.com/feed/", name: "Loop Barbados" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://www.starcomnetwork.com/feed/", name: "Starcom Barbados" },
     ],
     economico: [
       { url: "https://www.nationnews.com/feed/", name: "Nation News" },
@@ -240,6 +264,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.barbadosadvocate.com/feed/", name: "Barbados Advocate" },
       { url: "https://www.barbadosbusinessauthority.com/feed/", name: "Barbados Business Authority" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://www.nationnews.com/feed/", name: "Nation News" },
@@ -247,6 +272,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.loopnewsbarbados.com/feed/", name: "Loop Barbados" },
       { url: "https://www.barbadosadvocate.com/feed/", name: "Barbados Advocate" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     relaciones_internacionales: [
       { url: "https://www.nationnews.com/feed/", name: "Nation News" },
@@ -254,6 +280,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://www.barbadosadvocate.com/feed/", name: "Barbados Advocate" },
       { url: "https://www.starcomnetwork.com/feed/", name: "Starcom Barbados" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
   },
   "Belmopán": {
@@ -263,20 +290,26 @@ const LOCATION_FEEDS = {
       { url: "https://www.breakingbelizenews.com/feed/", name: "Breaking Belize News" },
       { url: "https://www.7newsbelize.com/feed/", name: "7News Belize" },
       { url: "https://www.reporter.bz/feed/", name: "Reporter Belize" },
+      { url: "https://www.belizetimes.bz/feed/", name: "Belize Times" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     economico: [
       { url: "https://edition.channel5belize.com/feed/", name: "Channel 5 Belize" },
       { url: "https://amandala.com.bz/news/feed/", name: "Amandala" },
       { url: "https://www.7newsbelize.com/feed/", name: "7News Belize" },
       { url: "https://www.belizetimes.bz/feed/", name: "Belize Times" },
+      { url: "https://www.reporter.bz/feed/", name: "Reporter Belize" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://edition.channel5belize.com/feed/", name: "Channel 5 Belize" },
       { url: "https://amandala.com.bz/news/feed/", name: "Amandala" },
       { url: "https://lovefm.com/feed/", name: "Love FM Belize" },
+      { url: "https://www.breakingbelizenews.com/feed/", name: "Breaking Belize News" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     relaciones_internacionales: [
       { url: "https://edition.channel5belize.com/feed/", name: "Channel 5 Belize" },
@@ -284,6 +317,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.reporter.bz/feed/", name: "Reporter Belize" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://www.7newsbelize.com/feed/", name: "7News Belize" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
   },
   "Saint George's": {
@@ -293,6 +327,8 @@ const LOCATION_FEEDS = {
       { url: "https://www.loopnewsgrenada.com/feed/", name: "Loop Grenada" },
       { url: "https://www.thegrenadainformer.com/feed/", name: "Grenada Informer" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://caribbeanmediagroup.com/feed/", name: "CMC Caribbean" },
     ],
     economico: [
       { url: "https://www.nowgrenada.com/feed/", name: "Now Grenada" },
@@ -300,18 +336,23 @@ const LOCATION_FEEDS = {
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://www.gov.gd/feed/", name: "GIS Grenada" },
       { url: "https://www.thegrenadainformer.com/feed/", name: "Grenada Informer" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://www.nowgrenada.com/feed/", name: "Now Grenada" },
       { url: "https://www.loopnewsgrenada.com/feed/", name: "Loop Grenada" },
       { url: "https://www.thegrenadainformer.com/feed/", name: "Grenada Informer" },
+      { url: "https://grenadabroadcast.com/feed/", name: "Grenada Broadcasting" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     relaciones_internacionales: [
       { url: "https://www.nowgrenada.com/feed/", name: "Now Grenada" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://www.loopnewsgrenada.com/feed/", name: "Loop Grenada" },
       { url: "https://www.gov.gd/feed/", name: "GIS Grenada" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://caribbeanmediagroup.com/feed/", name: "CMC Caribbean" },
     ],
   },
   "Puerto Príncipe": {
@@ -322,6 +363,8 @@ const LOCATION_FEEDS = {
       { url: "https://www.metropolehaiti.com/feed/", name: "Radio Métropole Haiti" },
       { url: "https://haiti24.net/feed/", name: "Haiti 24" },
       { url: "https://gazettehaiti.com/feed/", name: "Gazette Haiti" },
+      { url: "https://haitiinformationproject.com/feed/", name: "Haiti Information Project" },
+      { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
     ],
     economico: [
       { url: "https://www.alterpresse.org/rss.php", name: "AlterPresse" },
@@ -329,6 +372,7 @@ const LOCATION_FEEDS = {
       { url: "https://lenouvelliste.com/feed/", name: "Le Nouvelliste" },
       { url: "https://haiti24.net/feed/", name: "Haiti 24" },
       { url: "https://gazettehaiti.com/feed/", name: "Gazette Haiti" },
+      { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
     ],
     cultural: [
       { url: "https://www.haitilibre.com/rss/haiti-culture.xml", name: "Haiti Libre Cultura" },
@@ -336,6 +380,7 @@ const LOCATION_FEEDS = {
       { url: "https://lenouvelliste.com/feed/", name: "Le Nouvelliste" },
       { url: "https://www.metropolehaiti.com/feed/", name: "Radio Métropole Haiti" },
       { url: "https://haitiinformationproject.com/feed/", name: "Haiti Information Project" },
+      { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
     ],
     relaciones_internacionales: [
       { url: "https://www.haitilibre.com/rss/haiti-international.xml", name: "Haiti Libre Internacional" },
@@ -343,6 +388,8 @@ const LOCATION_FEEDS = {
       { url: "https://lenouvelliste.com/feed/", name: "Le Nouvelliste" },
       { url: "https://haitiinformationproject.com/feed/", name: "Haiti Information Project" },
       { url: "https://haiti24.net/feed/", name: "Haiti 24" },
+      { url: "https://gazettehaiti.com/feed/", name: "Gazette Haiti" },
+      { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
     ],
   },
   "Basseterre": {
@@ -352,6 +399,8 @@ const LOCATION_FEEDS = {
       { url: "https://sknvibes.com/feed/", name: "SKN Vibes" },
       { url: "https://zizonline.com/feed/", name: "ZIZ St Kitts" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://www.loopnewsskn.com/feed/", name: "Loop SKN" },
     ],
     economico: [
       { url: "https://www.thestkittsnevisobserver.com/feed/", name: "SKN Observer" },
@@ -359,12 +408,15 @@ const LOCATION_FEEDS = {
       { url: "https://www.loopnewsskn.com/feed/", name: "Loop SKN" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://sknvibes.com/feed/", name: "SKN Vibes" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://www.thestkittsnevisobserver.com/feed/", name: "SKN Observer" },
       { url: "https://sknvibes.com/feed/", name: "SKN Vibes" },
       { url: "https://www.loopnewsskn.com/feed/", name: "Loop SKN" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://zizonline.com/feed/", name: "ZIZ St Kitts" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     relaciones_internacionales: [
       { url: "https://www.thestkittsnevisobserver.com/feed/", name: "SKN Observer" },
@@ -372,6 +424,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://zizonline.com/feed/", name: "ZIZ St Kitts" },
       { url: "https://www.loopnewsskn.com/feed/", name: "Loop SKN" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
   },
   "Castries": {
@@ -381,6 +434,8 @@ const LOCATION_FEEDS = {
       { url: "https://www.loopnewsstlucia.com/feed/", name: "Loop St. Lucia" },
       { url: "https://thelusianstar.com/feed/", name: "Lucian Star" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://caribbeanmediagroup.com/feed/", name: "CMC Caribbean" },
     ],
     economico: [
       { url: "https://stluciatimes.com/feed/", name: "St. Lucia Times" },
@@ -388,6 +443,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.loopnewsstlucia.com/feed/", name: "Loop St. Lucia" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://thelusianstar.com/feed/", name: "Lucian Star" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://stluciatimes.com/feed/", name: "St. Lucia Times" },
@@ -395,6 +451,7 @@ const LOCATION_FEEDS = {
       { url: "https://thelusianstar.com/feed/", name: "Lucian Star" },
       { url: "https://rci.fm/feed/", name: "RCI Radio Caribbean" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     relaciones_internacionales: [
       { url: "https://stluciatimes.com/feed/", name: "St. Lucia Times" },
@@ -402,6 +459,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://rci.fm/feed/", name: "RCI Radio Caribbean" },
       { url: "https://www.loopnewsstlucia.com/feed/", name: "Loop St. Lucia" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
   },
   "Kingstown": {
@@ -411,6 +469,8 @@ const LOCATION_FEEDS = {
       { url: "https://thevincentian.com/feed/", name: "Vincentian" },
       { url: "https://nbcsvg.com/feed/", name: "NBC SVG" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://www.loopnewssvg.com/feed/", name: "Loop SVG" },
     ],
     economico: [
       { url: "https://iwnsvg.com/feed/", name: "iWitness News SVG" },
@@ -418,6 +478,7 @@ const LOCATION_FEEDS = {
       { url: "https://thevincentian.com/feed/", name: "Vincentian" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://www.loopnewssvg.com/feed/", name: "Loop SVG" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://iwnsvg.com/feed/", name: "iWitness News SVG" },
@@ -425,6 +486,7 @@ const LOCATION_FEEDS = {
       { url: "https://thevincentian.com/feed/", name: "Vincentian" },
       { url: "https://www.loopnewssvg.com/feed/", name: "Loop SVG" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     relaciones_internacionales: [
       { url: "https://iwnsvg.com/feed/", name: "iWitness News SVG" },
@@ -432,6 +494,7 @@ const LOCATION_FEEDS = {
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
       { url: "https://nbcsvg.com/feed/", name: "NBC SVG" },
       { url: "https://thevincentian.com/feed/", name: "Vincentian" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
   },
   "Paramaribo": {
@@ -441,20 +504,25 @@ const LOCATION_FEEDS = {
       { url: "https://www.dwt-online.com/feed/", name: "De Ware Tijd" },
       { url: "https://www.dbsuriname.com/feed/", name: "Dagblad Suriname" },
       { url: "https://surinametimes.net/feed/", name: "Suriname Times" },
+      { url: "https://www.starnieuws.com/rss/starnieuws.rss", name: "Starnieuws" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     economico: [
       { url: "https://www.waterkant.net/feed/", name: "Waterkant" },
       { url: "https://www.srherald.com/feed/", name: "Suriname Herald" },
       { url: "https://www.dwt-online.com/feed/", name: "De Ware Tijd" },
       { url: "https://surinametimes.net/feed/", name: "Suriname Times" },
+      { url: "https://www.dbsuriname.com/feed/", name: "Dagblad Suriname" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
     ],
     cultural: [
       { url: "https://www.waterkant.net/feed/", name: "Waterkant" },
       { url: "https://www.dbsuriname.com/feed/", name: "Dagblad Suriname" },
       { url: "https://surinametimes.net/feed/", name: "Suriname Times" },
       { url: "https://www.starnieuws.com/rss/starnieuws.rss", name: "Starnieuws" },
+      { url: "https://www.srherald.com/feed/", name: "Suriname Herald" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
     ],
     relaciones_internacionales: [
@@ -463,6 +531,8 @@ const LOCATION_FEEDS = {
       { url: "https://www.dwt-online.com/feed/", name: "De Ware Tijd" },
       { url: "https://www.starnieuws.com/rss/starnieuws.rss", name: "Starnieuws" },
       { url: "https://www.caribbean360.com/feed", name: "Caribbean360" },
+      { url: "https://caribjournal.com/feed/", name: "Caribbean Journal" },
+      { url: "https://surinametimes.net/feed/", name: "Suriname Times" },
     ],
   },
 };
