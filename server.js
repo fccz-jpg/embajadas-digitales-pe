@@ -71,34 +71,37 @@ const LOCATION_FEEDS = {
       { url: "https://www.elheraldo.mx/rss.xml", name: "El Heraldo" },
       { url: "https://www.24-horas.mx/feed/", name: "24 Horas" },
       { url: "https://www.reporteindigo.com/feed/", name: "Reporte Índigo" },
+      { url: "https://aristeguinoticias.com/feed/", name: "Aristegui Noticias" },
+      { url: "https://www.sdpnoticias.com/feed/", name: "SDP Noticias" },
     ],
     economico: [
       { url: "https://expansion.mx/rss", name: "Expansión" },
       { url: "https://www.elfinanciero.com.mx/rss", name: "El Financiero" },
       { url: "https://www.eleconomista.com.mx/rss/", name: "El Economista" },
-      { url: "https://www.milenio.com/rss", name: "Milenio" },
       { url: "https://www.eluniversal.com.mx/rss/cartera.xml", name: "El Universal Cartera" },
       { url: "https://www.jornada.com.mx/rss/economia.xml", name: "La Jornada Economía" },
       { url: "https://www.forbes.com.mx/feed/", name: "Forbes México" },
       { url: "https://www.excelsior.com.mx/rss.xml", name: "Excélsior" },
+      { url: "https://www.reporteindigo.com/feed/", name: "Reporte Índigo" },
+      { url: "https://www.elheraldo.mx/rss.xml", name: "El Heraldo" },
     ],
     cultural: [
       { url: "https://www.eluniversal.com.mx/rss/cultura.xml", name: "El Universal Cultura" },
       { url: "https://www.jornada.com.mx/rss/cultura.xml", name: "La Jornada Cultura" },
-      { url: "https://www.milenio.com/rss", name: "Milenio" },
       { url: "https://www.excelsior.com.mx/rss.xml", name: "Excélsior" },
       { url: "https://www.proceso.com.mx/rss/", name: "Proceso" },
       { url: "https://www.animalpolitico.com/feed", name: "Animal Político" },
       { url: "https://www.elheraldo.mx/rss.xml", name: "El Heraldo" },
+      { url: "https://aristeguinoticias.com/feed/", name: "Aristegui Noticias" },
     ],
     relaciones_internacionales: [
       { url: "https://www.jornada.com.mx/rss/mundo.xml", name: "La Jornada Mundo" },
       { url: "https://www.eluniversal.com.mx/rss/mundo.xml", name: "El Universal Mundo" },
       { url: "https://www.proceso.com.mx/rss/", name: "Proceso" },
-      { url: "https://www.milenio.com/rss", name: "Milenio" },
       { url: "https://www.excelsior.com.mx/rss.xml", name: "Excélsior" },
       { url: "https://expansion.mx/rss", name: "Expansión" },
       { url: "https://www.reporteindigo.com/feed/", name: "Reporte Índigo" },
+      { url: "https://aristeguinoticias.com/feed/", name: "Aristegui Noticias" },
     ],
   },
   "San Marino": {
@@ -466,19 +469,19 @@ const LOCATION_FEEDS = {
 
 // ── Country name aliases for keyword matching ────────────────────────────────
 const LOCATION_COUNTRY_TERMS = {
-  "Ciudad de México": ["méxico","mexico","mexicano","mexicana","azteca"],
-  "San Marino":       ["san marino","sanmarinese","sammarinese"],
-  "Timbu":            ["bhutan","bután","bhutanese","butanés"],
-  "Saint John's":     ["antigua","barbuda","antiguan"],
-  "Nasáu":            ["bahamas","bahamian","bahameño"],
-  "Bridgetown":       ["barbados","barbadian","barbadense"],
-  "Belmopán":         ["belize","belice","belizean","beliceño"],
-  "Saint George's":   ["grenada","granada","grenadian","granadino"],
-  "Puerto Príncipe":  ["haiti","haití","haitian","haitiano"],
-  "Basseterre":       ["saint kitts","san cristóbal","nevis","kittitian","nevisian"],
-  "Castries":         ["saint lucia","santa lucía","st. lucia","lucian","luciano"],
-  "Kingstown":        ["saint vincent","san vicente","granadinas","vincentian"],
-  "Paramaribo":       ["suriname","surinam","surinamese","surinamés"],
+  "Ciudad de México": ["méxico","mexico","mexicano","mexicana","cdmx","ciudad de méxico","gobierno federal","sheinbaum","morena","banxico","pemex","cfe","nafta","tmec","senado mexicano","congreso mexicano","banco de méxico"],
+  "San Marino":       ["san marino","sanmarinese","sammarinese","serenissima","titano"],
+  "Timbu":            ["bhutan","bután","bhutanese","butanés","thimphu","timbu","wangchuck","druk"],
+  "Saint John's":     ["antigua","barbuda","antiguan","saint john","wadadli"],
+  "Nasáu":            ["bahamas","bahamian","bahameño","nassau","nasáu","new providence"],
+  "Bridgetown":       ["barbados","barbadian","barbadense","bridgetown","bajan"],
+  "Belmopán":         ["belize","belice","belizean","beliceño","belmopan","belmopán","belizean"],
+  "Saint George's":   ["grenada","granada","grenadian","granadino","spice isle"],
+  "Puerto Príncipe":  ["haiti","haití","haitian","haitiano","port-au-prince","puerto príncipe","ayiti"],
+  "Basseterre":       ["saint kitts","san cristóbal","nevis","kittitian","nevisian","basseterre","st. kitts"],
+  "Castries":         ["saint lucia","santa lucía","st. lucia","lucian","luciano","castries"],
+  "Kingstown":        ["saint vincent","san vicente","granadinas","vincentian","kingstown","svg"],
+  "Paramaribo":       ["suriname","surinam","surinamese","surinamés","paramaribo","surinaams"],
 };
 
 // ── Category keyword filter (for general feeds that cover all topics) ────────
@@ -571,23 +574,19 @@ async function fetchCategoryNews(location, category) {
     const results = await Promise.all(feeds.map(f => fetchFeed(f, category)));
     const allItems = results.flat();
 
-    // For category-specific feeds (e.g. jornada.com.mx/rss/politica.xml), only filter by country
-    // For general feeds, filter by both category + country
-    const hasSpecificFeed = feeds.some(f => f.url.includes(
-      { politico: 'politi', economico: 'econom', cultural: 'cultur', relaciones_internacionales: 'mundo' }[category] || '___'
-    ));
-
-    if (hasSpecificFeed) {
-      // Specific feed: trust the category, only ensure country relevance
-      const filtered = allItems.filter(item => {
+    // ALWAYS filter by country terms — never return unrelated foreign news.
+    // If country filter yields < 3, keep those few and supplement with Google News below.
+    if (countryTerms.length > 0) {
+      items = allItems.filter(item => {
         const text = `${item.title} ${item.preview}`.toLowerCase();
-        return countryTerms.length === 0 || countryTerms.some(k => text.includes(k));
+        return countryTerms.some(k => text.includes(k));
       });
-      items = filtered.length >= 3 ? filtered : allItems;
     } else {
-      // General feed: filter by both
-      const filtered = allItems.filter(matchesFilter);
-      items = filtered.length >= 3 ? filtered : allItems;
+      // No country terms defined → filter at least by category keywords
+      items = allItems.filter(item => {
+        const text = `${item.title} ${item.preview}`.toLowerCase();
+        return categoryKeywords.length === 0 || categoryKeywords.some(k => text.includes(k));
+      });
     }
   }
 
